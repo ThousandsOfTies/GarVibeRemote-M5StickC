@@ -95,7 +95,7 @@ def prepare_hooks(project: Path, config_path: Path, *, replace_product: Path | N
     if not project.is_dir():raise SetupError('監視するプロジェクトのフォルダーが存在しません。')
     config = read_config(config_path)
     if config.get('watchInput'):
-        raise SetupError('現在のPlus2では実機からの承認入力は未接続です。監視用設定を作り直してください。')
+        raise SetupError('導入支援のHookは監視専用です。watchInputを無効にした監視用設定を使用してください。')
     sender = APP / 'scripts/codex-hook.py'
     if not sender.is_file():raise SetupError('共有Appがありません。prepareを実行してください。')
     path = project.resolve()/'.codex/hooks.json'

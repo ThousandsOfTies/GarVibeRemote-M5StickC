@@ -97,6 +97,12 @@ test('session names match state frame colors with black glyphs, including list f
   a.press('C');a.tick(50);colorAt(10,70,0x9c263b);colorAt(10,107,0);
   a.hardware(true,false);a.tick(50);colorAt(10,30,0x4d5552);
 });
+test('lost acknowledgement does not leave the UI pending or replay an answer on reconnect',async()=>{
+  const a=await app();a.receive(question());a.press('A');assert.equal(a.action().actionId,'no');
+  a.hardware(true,false);assert.equal(a.state().pending,'');assert.match(a.state().error,/接続/);
+  a.hardware(true,true);a.receive(question());a.tick(100);assert.equal(a.action(),null);
+  a.press('A');assert.equal(a.action().actionId,'no'); // Explicit retry only.
+});
 test('short text stays still; identical status updates retain scroll and choice',async()=>{
   const a=await app(),q=question();a.receive(q);a.tick(5800);a.press('C');
   const before=a.state();a.receive(q);assert.equal(a.state().scrollPixels,before.scrollPixels);assert.equal(a.state().choice,0);

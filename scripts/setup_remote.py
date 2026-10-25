@@ -26,12 +26,13 @@ def source_hash():
     digest=hashlib.sha256()
     files=[APP/'src'/name for name in ('codexBridge.ts','codexInteraction.ts','codexStatus.ts','protocol.ts')]
     files+=[ROOT/'config/connection-node/package-lock.json']
+    files+=[ROOT/'scripts/device_bridge.cjs']
     for path in files:digest.update(path.name.encode());digest.update(path.read_bytes())
     return digest.hexdigest()
 
 def runtime_ready():
     try:
-        return (RUNTIME/'codexBridge.cjs').is_file() and (RUNTIME/'node_modules/ws/package.json').is_file() and json.loads((RUNTIME/'build.json').read_text())['sourceHash']==source_hash()
+        return all((RUNTIME/name).is_file() for name in ('codexBridge.cjs','deviceBridge.cjs','node_modules/ws/package.json','node_modules/serialport/package.json')) and json.loads((RUNTIME/'build.json').read_text())['sourceHash']==source_hash()
     except (OSError,ValueError,KeyError):return False
 
 def run(command,*,cwd=ROOT,capture=False):
@@ -55,6 +56,8 @@ def prepare_dependencies():
            "nodePaths:[process.argv[4]],alias:{ws:process.argv[4]+'/ws'},bundle:true,"
            "platform:'node',format:'cjs',target:'node24',logLevel:'info'})")
     run([node,'-e',build,RUNTIME/'node_modules/esbuild',APP/'src/codexBridge.ts',RUNTIME/'codexBridge.cjs',RUNTIME/'node_modules'])
+    device_build=build.replace("bundle:true,","bundle:true,external:['serialport'],")
+    run([node,'-e',device_build,RUNTIME/'node_modules/esbuild',ROOT/'scripts/device_bridge.cjs',RUNTIME/'deviceBridge.cjs',RUNTIME/'node_modules'])
     (RUNTIME/'build.json').write_text(json.dumps({'sourceHash':source_hash()})+'\n',encoding='utf-8')
 
 def classify_ports(items):
@@ -109,7 +112,8 @@ def doctor(path):
     report={'python':sys.version.split()[0],'node':bool(shutil.which('node')),'npm':bool(shutil.which('npm')),
             'git':bool(shutil.which('git')),'application':(APP/'src/codexBridge.ts').is_file(),
             'bridgeBuilt':runtime_ready(),'ports':ports,'portNote':note,
-            'deviceFirmware':'usb-test-source','deviceTransport':'usb-serial','bleTransport':'not-implemented','simulator':'local-mock',
+            'deviceFirmware':'spp-usb-source','deviceTransport':'not-checked',
+            'deviceTransports':['usb-serial','bluetooth-spp'],'bleTransport':'not-implemented','simulator':'local-mock',
             'deviceInput':'not-checked'}
     if not path.exists():report['config']='missing'
     else:
@@ -135,6 +139,8 @@ def main(argv=None):
     parser.add_argument('--config',type=Path,default=CONFIG)
     commands=parser.add_subparsers(dest='command',required=True)
     for name in ('doctor','ports','prepare','bridge','test'):commands.add_parser(name)
+    for name in ('device','device-test'):
+        sub=commands.add_parser(name);sub.add_argument('--port',required=True);sub.add_argument('--transport',required=True,choices=['usb','spp'])
     for name in ('configure','setup'):
         sub=commands.add_parser(name);sub.add_argument('--project',type=Path,required=True)
         sub.add_argument('--session-id');sub.add_argument('--label');sub.add_argument('--port',type=int)
@@ -155,7 +161,7 @@ def main(argv=None):
             if args.command=='setup':
                 settings.prepare_hooks(args.project,args.config,replace_product=args.replace_product)
                 print('Hook定義を準備しました。Codex側でレビュー・信頼してください。')
-            print('PC接続設定を準備しました（トークン非表示）。USB実機試験は実機版ガイドを確認してください。')
+            print('PC接続設定を準備しました（トークン非表示）。実機接続はSPP／USB接続ガイドを確認してください。')
         elif args.command=='hooks':
             settings.prepare_hooks(args.project,args.config,replace_product=args.replace_product)
             print('Hook定義を準備しました。Codex側でレビュー・信頼してください。')
@@ -163,6 +169,15 @@ def main(argv=None):
             node=shutil.which('node')
             if not node or not runtime_ready():raise SetupError('prepareでNode.jsの実行環境を先に準備してください。')
             if args.command=='test':run([node,ROOT/'scripts/connection_test.cjs',RUNTIME])
+            elif args.command in ('device','device-test'):
+                ports,_=serial_ports();kind='bluetooth' if args.transport=='spp' else 'usb'
+                if os.name=='nt' and not any(p['port']==args.port.upper() and p['kind']==kind for p in ports):
+                    raise SetupError('指定した種類のCOMポートを確認できません。portsで確認してください。')
+                if args.command=='device-test':
+                    run([node,ROOT/'scripts/device_trial.cjs',RUNTIME,'--port',args.port,'--transport',args.transport])
+                else:
+                    settings.read_config(args.config)
+                    run([node,RUNTIME/'deviceBridge.cjs','--config',args.config.resolve(),'--port',args.port,'--transport',args.transport])
             else:
                 settings.read_config(args.config)
                 run([node,RUNTIME/'codexBridge.cjs','--config',args.config.resolve()])

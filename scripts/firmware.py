@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build/backup/flash the fixed M5StickC Plus2 USB firmware. No Bluetooth setup."""
+"""Build/backup/flash the fixed M5StickC Plus2 SPP/USB firmware. No pairing UI."""
 from __future__ import annotations
 import argparse
 from datetime import datetime

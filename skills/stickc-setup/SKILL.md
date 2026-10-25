@@ -1,6 +1,6 @@
 ---
 name: stickc-setup
-description: Set up or diagnose GarVibeRemote-M5StickC for M5StickC Plus2 on Windows, including PC settings, Codex hooks, the status bridge and USB test firmware. Use for installation or migration; BLE and live Codex-to-device integration are not yet implemented.
+description: Set up or reconnect GarVibeRemote-M5StickC on Windows, including Plus2 firmware, Bluetooth Classic SPP or USB, the PC status bridge and monitoring hooks. Use for installation, migration or OFFLINE diagnosis. BLE is not implemented.
 ---
 
 # StickC setup
@@ -11,9 +11,10 @@ Read `docs/INSTALL.md` there for commands and the current completion criteria.
 
 Start with `python scripts/setup_remote.py doctor` from the Product root.
 It is read-only; report PC readiness separately from physical device readiness.
-The simulator uses local mock data. USB test firmware shares its real LVGL UI,
-but BLE transport and live multi-session Codex bridge integration are not
-implemented. Do not flash the old shared M5StickC client as this new UI.
+The simulator uses local mock data. SPP/USB firmware shares its real LVGL UI.
+The existing Codex bridge sends one selected (or latest observed) session;
+automatic live multi-session collection and BLE are not implemented.
+Do not flash the old shared M5StickC client as this portrait UI.
 
 For an explicit installation request, read `firmware/stickc-plus2/README.md`.
 Confirm the model is Plus2, using existing user confirmation when available;
@@ -22,8 +23,17 @@ to build, identify the USB device, save an 8MB flash backup and flash it.
 The installation request authorizes this replacement; no extra permission is
 needed once the target is known. Test the display, orientation and A/B/C with
 `scripts/serial_demo.py` using `.gar/firmware-tools` Python (includes pyserial).
-Only a received physical button response proves USB input. Synthetic sessions
+Only a received physical button response proves device input. Synthetic sessions
 are connection tests, not user permission for files, tools or other operations.
+
+For pairing, COM selection and relay operation read `docs/DEVICE_CONNECTION.md`.
+The device is `GarVibe-M5StickC-Plus2` (PIN 1234 if requested). Use its Windows
+outgoing COM port, never a remembered T-Watch COM number. `device-test --port
+COM_NUMBER --transport spp` runs an isolated physical trial; `device` uses the
+saved PC config. The relay keeps the PC token off the device. USB is a fallback;
+only one transport owns the UI, and a USB snapshot does not take ownership.
+Do not replay unanswered actions after a connection loss. Long-press approval
+requests stay on the PC because this UI confirms with a short A release.
 
 Use `prepare` for the isolated Node runtime and `configure --project PATH`
 for private settings. Retain existing tokens and session selections. To migrate
@@ -44,5 +54,5 @@ the PC. It is never a real user's YES/NO or permission for another action.
 
 Keep static HTTP serving, bridge operation and setup separate. Preserve the
 current work when diagnosing an unavailable connection. Do not configure
-Copilot or other AI clients, Bluetooth pairing or relay services as part of
-the PC or USB test setup.
+Copilot or other AI clients. Pairing and relay operation require the user's
+device-connection request; PC preparation alone does not authorize them.

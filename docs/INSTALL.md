@@ -3,8 +3,8 @@
 対象は **GarVibeRemote-M5StickC / M5StickC Plus2** です。旧Productの導入支援から、
 PCの設定生成・Hook登録・診断・通信試験を移植しました。Copilot監視は含めていません。
 
-PC側の設定と、[縦画面用のUSB実機試験版](../firmware/stickc-plus2/README.md)を準備できます。
-**BLE通信、PCブリッジと新画面のセッション／ack契約の接続は未実装**です。
+PC側の設定と、[縦画面用のSPP／USB実機版](../firmware/stickc-plus2/README.md)を準備できます。
+既存PCブリッジと新画面のセッション／ack契約はデバイス中継で接続します。BLEは未実装です。
 既存の共有M5StickCファームウェアはこの縦画面とは別実装なので、代わりに書き込みません。
 WebシミュレータとUSB試験用の質問は、どちらも模擬セッションです。
 
@@ -20,7 +20,7 @@ python scripts/setup_remote.py test
 python scripts/setup_remote.py install-skill
 ```
 
-`prepare`は固定した依存関係を`.gar/connection-node`へ導入し、共有AppのPCブリッジをビルドします。
+`prepare`は固定した依存関係を`.gar/connection-node`へ導入し、共有AppのPCブリッジとデバイス中継をビルドします。
 共有Appの開発用node_modulesやシミュレータは変更しません。
 `test`の`status: passed`と`scope: pc-loopback`は、PC内の認証・状態配信・質問／回答の試験です。
 仮のクライアントが回答するので、実機接続や本人の承認を意味しません。
@@ -32,7 +32,7 @@ python scripts/setup_remote.py install-skill
 
 `PROJECT`は監視するプロジェクトのフォルダー、`CHAT_ID`は対象チャットのIDです。
 チャットのIDを指定しない場合、既存PCブリッジは受け取った最新セッションの状態を表示します。
-新画面の複数セッション一覧への自動配信は、別途接続処理が必要です。
+実セッション一覧の自動収集は未実装です。デバイス中継は選択中の1セッションを新画面へ渡します。
 
 ```powershell
 python scripts/setup_remote.py configure --project "PROJECT" --session-id "CHAT_ID" --label "作業名"
@@ -82,8 +82,9 @@ python scripts/setup_remote.py ports
 `bridge.state: reachable`は認証付きHTTPでPCブリッジを読めたことを示します。
 `hooks.state: configured`は対象8イベントの送信定義があることだけを表し、
 `hooks.trust: not-checked`のとおりレビュー済みかは判定しません。
-`deviceFirmware`は`usb-test-source`、`deviceTransport`は`usb-serial`、`bleTransport`は
-`not-implemented`です。`deviceInput: not-checked`は、この診断では物理入力を検査していないことを表します。
+`deviceFirmware`は`spp-usb-source`、`deviceTransports`は`usb-serial`と`bluetooth-spp`、
+`bleTransport`は`not-implemented`です。`deviceTransport: not-checked`と`deviceInput: not-checked`は、
+この診断では実際の接続・物理入力を検査していないことを表します。
 
 `ports`はWindowsのUSB／Bluetoothポートを区別して列挙する診断機能です。
 COM番号だけから機種や送信方向、BLE接続の可否を判定しません。BLEはシリアルCOMと別の接続方式です。
@@ -99,7 +100,7 @@ COM番号だけから機種や送信方向、BLE接続の可否を判定しま�
 | authentication-error | 起動中のブリッジとPC設定の対応を確認する |
 | sessionMatches: false | 起動中の監視先が保存した設定と異なる |
 | hooks.state: missing / incomplete | `hooks --project`で定義を準備し、Codexでレビューする |
-| PC試験成功だが実機に表示されない | USB実機版の書き込みとserial_demoの起動を確認する。実Codexへの接続は未実装 |
+| PC試験成功だが実機に表示されない | [SPP／USB接続ガイド](DEVICE_CONNECTION.md)に沿って書き込み・ペアリング・device-test・deviceを確認する |
 
 旧フォルダーを削除する前に、稼働中ブリッジ、Hook、旧スキルの参照先を確認します。
 この実装の移植だけでは、利用中の設定やサービスを勝手に切り替えません。

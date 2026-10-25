@@ -109,7 +109,8 @@ class SetupTests(unittest.TestCase):
             before=path.read_bytes();token=settings.read_config(path)['token']
             with patch.object(setup,'serial_ports',return_value=([],None)),patch.object(setup,'bridge_status',return_value={'state':'offline'}):
                 report=setup.doctor(path)
-            self.assertEqual(path.read_bytes(),before);self.assertEqual(report['deviceTransport'],'usb-serial')
+            self.assertEqual(path.read_bytes(),before);self.assertEqual(report['deviceTransport'],'not-checked')
+            self.assertEqual(report['deviceTransports'],['usb-serial','bluetooth-spp'])
             self.assertEqual(report['bleTransport'],'not-implemented');self.assertEqual(report['deviceInput'],'not-checked')
             serialized=json.dumps(report)
             for secret in (token,'private-session','private-label','watchInput'):self.assertNotIn(secret,serialized)
@@ -172,5 +173,26 @@ class SetupTests(unittest.TestCase):
             with contextlib.redirect_stderr(io.StringIO()) as output:
                 code=setup.main(['--config',str(path),'configure','--project',str(root)])
             self.assertEqual(code,1);self.assertNotIn(secret,output.getvalue())
+
+    def test_device_command_checks_transport_and_keeps_credentials_out_of_arguments(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);config=root/'config.json';settings.configure(config,project=root)
+            ports=[{'port':'COM6','kind':'usb'},{'port':'COM9','kind':'bluetooth'}]
+            with patch.object(setup,'runtime_ready',return_value=True),patch.object(setup,'serial_ports',return_value=(ports,None)),patch.object(setup,'run') as run:
+                self.assertEqual(setup.main(['--config',str(config),'device','--port','COM9','--transport','spp']),0)
+                command=run.call_args.args[0];self.assertIn('COM9',command)
+                self.assertNotIn(settings.read_config(config)['token'],str(command))
+                run.reset_mock()
+                if os.name=='nt':
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        self.assertEqual(setup.main(['--config',str(config),'device','--port','COM6','--transport','spp']),1)
+                    run.assert_not_called()
+
+    def test_physical_trial_does_not_require_or_modify_private_configuration(self):
+        with tempfile.TemporaryDirectory() as folder:
+            config=Path(folder)/'missing.json'
+            with patch.object(setup,'runtime_ready',return_value=True),patch.object(setup,'serial_ports',return_value=([{'port':'COM9','kind':'bluetooth'}],None)),patch.object(setup,'run') as run:
+                self.assertEqual(setup.main(['--config',str(config),'device-test','--port','COM9','--transport','spp']),0)
+            self.assertFalse(config.exists());self.assertNotIn('--config',run.call_args.args[0])
 
 if __name__=='__main__':unittest.main()

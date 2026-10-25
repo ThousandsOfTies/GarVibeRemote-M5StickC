@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "esbuild": "0.28.1",
+    "serialport": "13.0.0",
     "ws": "8.21.0"
   }
 }

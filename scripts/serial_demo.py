@@ -49,10 +49,13 @@ def main():
                 if type=='deviceInfo':
                     if message.get('device')!='m5stickc-plus2' or (message.get('width'),message.get('height'))!=(135,240):
                         raise RuntimeError('Unexpected device or display dimensions')
+                    if message.get('protocol')=='gar-compact-v1' and message.get('activeTransport')!='usb-serial':continue
                     print(json.dumps({'event':'device-ready',**message}),flush=True)
                     # Also restore the trial after the device reboots on the
                     # same USB port. Repeated snapshots retain UI focus/scroll.
                     send({'type':'sessions','sessions':samples});ready=True
+                elif type=='busy':
+                    raise RuntimeError('Another USB/SPP controller owns the display; stop that relay first')
                 elif type=='uiAction':
                     s=by_id.get(message.get('sessionId'));actions=s['ui']['actions'] if s else []
                     valid=bool(s and s['ui']['id']==message.get('uiId') and any(a['id']==message.get('actionId') for a in actions))
@@ -68,7 +71,11 @@ def main():
             if not ready and now-started>12:raise RuntimeError('Device did not respond to USB handshake')
     except KeyboardInterrupt:return 0
     except (serial.SerialException,RuntimeError,OSError) as error:print(f'USB test failed: {error}',file=sys.stderr);return 1
-    finally:port.close()
+    finally:
+        if port.is_open:
+            try:send({'type':'goodbye'});port.flush()
+            except (serial.SerialException,OSError):pass
+        port.close()
     return 0
 
 if __name__=='__main__':raise SystemExit(main())
