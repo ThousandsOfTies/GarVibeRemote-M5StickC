@@ -62,6 +62,40 @@ test('text scrolls at 9 px/s after initial pause, pauses at end, then loops',asy
   const travel=Math.ceil(maximum*1000/9);a.tick(travel-2000);assert.equal(a.state().scrollPixels,maximum);
   a.tick(2799);assert.equal(a.state().scrollPixels,maximum);a.tick(1);assert.equal(a.state().scrollPixels,0);
 });
+test('session names use muted state backgrounds and black glyphs, including list focus',async()=>{
+  const a=await app();
+  const pixel=(x,y)=>{
+    const start=a.m._gar_lv_framebuffer()+(y*135+x)*4;
+    return [...a.m.HEAPU8.slice(start,start+3)];
+  };
+  const colorAt=(x,y,color)=>{
+    const r=(color>>19)&31,g=(color>>10)&63,b=(color>>3)&31;
+    const expected=[(r<<3)|(r>>2),(g<<2)|(g>>4),(b<<3)|(b>>2)];
+    assert.ok(pixel(x,y).every((channel,i)=>Math.abs(channel-expected[i])<=1),`background at ${x},${y}`);
+  };
+  const blackGlyphs=(x,y,w,h)=>{
+    let count=0;
+    for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)if(pixel(xx,yy).every(c=>c===0))count++;
+    return count;
+  };
+  const palette=[['waiting',0x9f6667],['running',0x5d976c],['idle',0x8b958e],['failed',0x9f6667],['done',0x8b958e]];
+  for(const [state,color] of palette){
+    const q=question();q.session.name='ABC';q.ui.state=state;a.receive(q);a.tick(50);
+    colorAt(10,30,color);assert.ok(blackGlyphs(13,32,50,21)>20,`${state} has black name glyphs`);
+    assert.equal(a.state().sessionNameBackground,color);assert.equal(a.state().sessionNameTextColor,0);
+  }
+  const states=palette.slice(0,3).map(([state],i)=>{
+    const q=question(`s${i+1}`);q.session.name='ABC';q.ui.state=state;return q;
+  });
+  a.receive(list(...states));a.press('B');a.tick(50);colorAt(10,30,0x8b958e);
+  for(let i=0;i<3;i++){
+    colorAt(14,64+i*37,palette[i][1]);
+    assert.ok(blackGlyphs(34,66+i*37,50,21)>20,`list row ${i} has black name glyphs`);
+  }
+  colorAt(10,70,0);colorAt(10,107,0x5d976c);
+  a.press('C');a.tick(50);colorAt(10,70,0x9f6667);colorAt(10,107,0);
+  a.hardware(true,false);a.tick(50);colorAt(10,30,0x8b958e);
+});
 test('short text stays still; identical status updates retain scroll and choice',async()=>{
   const a=await app(),q=question();a.receive(q);a.tick(5800);a.press('C');
   const before=a.state();a.receive(q);assert.equal(a.state().scrollPixels,before.scrollPixels);assert.equal(a.state().choice,0);
