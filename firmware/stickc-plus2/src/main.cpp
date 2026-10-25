@@ -6,6 +6,7 @@
 #include <atomic>
 #include <lvgl.h>
 #include "DeviceLink.h"
+#include "PairingConsent.h"
 #include "CompactUi.cpp"
 
 #if !defined(CONFIG_BT_SPP_ENABLED)
@@ -20,8 +21,14 @@ BluetoothSerial bluetooth;
 StreamBufferHandle_t sppRx=nullptr;
 std::atomic<bool> sppOverflow{false};
 std::atomic<unsigned> sppEpoch{0};
+std::atomic<uint32_t> confirmNumber{UINT32_MAX};
+std::atomic<int> authenticationResult{0};
+stickc::PairingConsent pairing;
+unsigned authenticationAttempts=0;
+int lastAuthentication=0;
 unsigned observedEpoch=0;
 bool sppStarted=false,sppClient=false;
+bool pairingScreenVisible=false;
 stickc::JsonLines usbLines,sppLines;
 stickc::DeviceLease lease;
 lv_disp_buf_t drawBuffer;
@@ -40,13 +47,55 @@ void send(Transport link,const JsonDocument& doc) {
   else if(link==Transport::spp && sppStarted && bluetooth.hasClient())
     bluetooth.write(reinterpret_cast<const uint8_t*>(packet.data()),packet.size());
 }
-void hardware() { ui.hardware(true,lease.owner()!=Transport::none,battery); }
+void hardware() { ui.hardware(true,pairingScreenVisible || lease.owner()!=Transport::none,battery); }
+void pairingInfo(JsonDocument& doc) {
+  doc["pairingMode"]="ssp-numeric-comparison";doc["pairingState"]=pairing.state();
+  doc["authenticationAttempts"]=authenticationAttempts;
+  doc["lastAuthentication"]=lastAuthentication>0?"success":lastAuthentication<0?"failed":"not-observed";
+}
+void pairingScreen(const char* message,bool choices=false) {
+  pairingScreenVisible=true;
+  JsonDocument d;d["type"]="sessions";
+  auto s=d["sessions"].to<JsonArray>().add<JsonObject>();
+  s["session"]["id"]="bluetooth-pairing";s["session"]["name"]="Bluetooth登録";
+  s["ui"]["id"]=pairing.id();s["ui"]["state"]=choices?"waiting":"idle";s["ui"]["message"]=message;
+  if(choices) {
+    auto actions=s["ui"]["actions"].to<JsonArray>();
+    auto yes=actions.add<JsonObject>();yes["id"]="yes";yes["label"]="YES";
+    auto no=actions.add<JsonObject>();no["id"]="no";no["label"]="NO";
+  }
+  std::string packet;serializeJson(d,packet);ui.receive(packet.c_str());hardware();
+}
+void pollPairing() {
+  const auto code=confirmNumber.exchange(UINT32_MAX);
+  if(code!=UINT32_MAX) {
+    if(lease.owner()!=Transport::none)bluetooth.confirmReply(false);
+    else {
+      pairing.begin(millis());
+      char message[240];snprintf(message,sizeof(message),
+        "番号 %06lu\nPCと同じ番号ですか？\nCでYESを選び、Aで決定してください。",static_cast<unsigned long>(code));
+      pairingScreen(message,true);
+    }
+  }
+  const auto result=authenticationResult.exchange(0);
+  if(result) {
+    ++authenticationAttempts;lastAuthentication=result;
+    const bool visible=pairing.active();pairing.authenticated(result>0);
+    if(visible)pairingScreen(result>0?"登録できました。\nPCの接続中継を起動してください。":"登録に失敗しました。\nPCからもう一度登録してください。");
+  }
+  const bool awaiting=pairing.confirming();
+  if(pairing.expire(millis())) {
+    if(awaiting)bluetooth.confirmReply(false);
+    pairingScreen("登録を時間切れで中止しました。\nPCからもう一度登録してください。");
+  }
+}
 void hello(Transport link) {
   JsonDocument d;d["type"]="deviceInfo";d["device"]="m5stickc-plus2";
   d["protocol"]="gar-compact-v1";d["firmware"]="gar-stickc-spp-v1";d["transport"]=stickc::name(link);
   d["activeTransport"]=stickc::name(lease.owner());d["bluetoothName"]=bluetoothName;d["sppReady"]=sppStarted;
   d["width"]=M5.Display.width();d["height"]=M5.Display.height();
   d["board"]=static_cast<int>(M5.getBoard());d["battery"]=battery;
+  pairingInfo(d);
   send(link,d);
 }
 void receive(Transport link,const std::string& packet) {
@@ -55,14 +104,15 @@ void receive(Transport link,const std::string& packet) {
   if(type=="snapshot") {
     JsonDocument answer;deserializeJson(answer,ui.snapshot());answer["type"]="snapshot";
     answer["transport"]=stickc::name(link);answer["activeTransport"]=stickc::name(lease.owner());
-    answer["sppReady"]=sppStarted;answer["sppClient"]=sppClient;send(link,answer);return;
+    answer["sppReady"]=sppStarted;answer["sppClient"]=sppClient;pairingInfo(answer);send(link,answer);return;
   }
   if(type=="goodbye") {
     if(lease.release(link))hardware();
     return;
   }
   if(type=="hello") {
-    if(lease.claim(link,millis())) { hardware();hello(link); }
+    if(pairing.active()) { JsonDocument busy;busy["type"]="busy";busy["activeTransport"]="pairing";send(link,busy); }
+    else if(lease.claim(link,millis())) { pairingScreenVisible=false;hardware();hello(link); }
     else { JsonDocument busy;busy["type"]="busy";busy["activeTransport"]=stickc::name(lease.owner());send(link,busy); }
     return;
   }
@@ -105,7 +155,7 @@ void readSpp() {
 void button(m5::Button_Class& button,char key) {
   auto edge=[key](int phase) {
     ui.button(key,phase);
-    if(lease.owner()!=Transport::none) {
+    if(!pairing.active() && lease.owner()!=Transport::none) {
       JsonDocument d;d["type"]="button";d["button"]=std::string(1,key);d["phase"]=phase?"down":"up";
       send(lease.owner(),d);
     }
@@ -133,13 +183,16 @@ void setup() {
     bluetooth.onData([](const uint8_t* data,size_t size) {
       if(xStreamBufferSend(sppRx,data,size,0)!=size)sppOverflow.store(true);
     });
-    bluetooth.setPin("1234");sppStarted=bluetooth.begin(bluetoothName);
+    bluetooth.enableSSP();
+    bluetooth.onConfirmRequest([](uint32_t number) { confirmNumber.store(number); });
+    bluetooth.onAuthComplete([](bool success) { authenticationResult.store(success?1:-1); });
+    sppStarted=bluetooth.begin(bluetoothName);
   }
   clockAt=millis();hello(Transport::usb);
 }
 void loop() {
   const auto now=millis();lv_tick_inc(now-clockAt);clockAt=now;
-  M5.update();readUsb();readSpp();
+  M5.update();pollPairing();readUsb();readSpp();
   if(lease.expire(millis()))hardware();
   // The enclosure's C / GPIO35 is exposed as BtnPWR by M5Unified.
   button(M5.BtnA,'A');button(M5.BtnB,'B');button(M5.BtnPWR,'C');
@@ -148,7 +201,14 @@ void loop() {
     batteryAt=now;battery=std::max(0,static_cast<int>(M5.Power.getBatteryLevel()));hardware();
   }
   ui.refresh();const auto action=ui.takeAction();
-  if(!action.empty() && lease.owner()!=Transport::none) {
+  if(!action.empty() && pairing.active()) {
+    JsonDocument d;deserializeJson(d,action);
+    const std::string id=d["uiId"]|"",answer=d["actionId"]|"";
+    if((d["sessionId"]|std::string())=="bluetooth-pairing" && (answer=="yes" || answer=="no") && pairing.answer(id,answer=="yes")) {
+      bluetooth.confirmReply(answer=="yes");
+      pairingScreen(answer=="yes"?"PCでも番号を確認して、接続を完了してください。":"登録を中止しました。");
+    }
+  } else if(!action.empty() && lease.owner()!=Transport::none) {
     JsonDocument d;deserializeJson(d,action);
     d["source"]=lease.owner()==Transport::spp?"m5stickc-plus2-spp":"m5stickc-plus2-usb";
     send(lease.owner(),d);

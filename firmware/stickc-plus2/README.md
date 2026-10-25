@@ -49,5 +49,8 @@ USB通信は115200bps、SPPも同じUTF-8の改行区切りJSONです。パケ�
 実機由来の`source`を付けて返します。PCはセッション・質問・回答IDを照合してackを返します。
 
 `deviceInfo`の`protocol: gar-compact-v1`、`sppReady`、`activeTransport`で起動状態を確認できます。
+ペアリングはSSPの6桁番号照合です。Plus2でCでYESを選び、Aで決定します。未確認・30秒の時間切れでは許可しません。
+`pairingMode`／`pairingState`／`authenticationAttempts`／`lastAuthentication`はUSBの`deviceInfo`・`snapshot`で確認できます。
+Bluetoothコールバックは認証要求と結果を通知するだけで、画面と確認操作はメインタスクで処理します。
 PCトークンはデバイス中継内で使うため、ファームウェアへ埋め込みません。
 BLEは未実装です。シミュレータ用のHTTPサーバや、旧T-WatchのBluetooth中継は使いません。

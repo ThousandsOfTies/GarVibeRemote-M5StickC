@@ -27,7 +27,13 @@ Only a received physical button response proves device input. Synthetic sessions
 are connection tests, not user permission for files, tools or other operations.
 
 For pairing, COM selection and relay operation read `docs/DEVICE_CONNECTION.md`.
-The device is `GarVibe-M5StickC-Plus2` (PIN 1234 if requested). Use its Windows
+The device is `GarVibe-M5StickC-Plus2`. Pair by comparing the six-digit numbers
+on Windows and Plus2, then C to select YES and A to confirm on the device, and
+confirm on Windows. Fixed PIN 1234 belongs to the previous firmware. A pairing
+request expires after 30 seconds; never auto-accept a number. Stop an active USB
+relay before pairing (a read-only USB snapshot is safe). Read `pairingMode`,
+`pairingState` and `lastAuthentication` for diagnosis without logging passkeys.
+Use its Windows
 outgoing COM port, never a remembered T-Watch COM number. `device-test --port
 COM_NUMBER --transport spp` runs an isolated physical trial; `device` uses the
 saved PC config. The relay keeps the PC token off the device. USB is a fallback;

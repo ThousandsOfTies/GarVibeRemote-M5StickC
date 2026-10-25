@@ -1,4 +1,5 @@
 #include "DeviceLink.h"
+#include "PairingConsent.h"
 #include <cassert>
 #include <iostream>
 #include <vector>
@@ -20,5 +21,17 @@ int main() {
   assert(lease.claim(Transport::spp,9000));assert(!lease.release(Transport::usb));assert(lease.release(Transport::spp));
   assert(lease.claim(Transport::usb,0xfffffff0));assert(!lease.expire(uint32_t(0xfffffff0+8000ULL)));
   assert(lease.expire(uint32_t(0xfffffff0+8001ULL)));
-  std::cout<<"PASS: independent framing, overflow recovery, exclusive ownership, lease expiry/wrap\n";
+  PairingConsent pairing;
+  assert(!pairing.active());assert(!pairing.answer("old",true));
+  pairing.begin(100);const auto first=pairing.id();assert(pairing.confirming());
+  assert(!pairing.answer("old",true));assert(pairing.answer(first,true));assert(!pairing.confirming());
+  assert(!pairing.answer(first,true));pairing.authenticated(true);assert(!pairing.active());
+  assert(std::string(pairing.state())=="paired");
+  pairing.begin(200);assert(pairing.id()!=first);assert(!pairing.answer(first,true));
+  assert(pairing.answer(pairing.id(),false));pairing.authenticated(false);
+  assert(std::string(pairing.state())=="rejected");
+  pairing.begin(0xfffffff0);assert(!pairing.expire(uint32_t(0xfffffff0+29999ULL)));
+  assert(pairing.expire(uint32_t(0xfffffff0+30000ULL)));assert(!pairing.answer(pairing.id(),true));
+  pairing.begin(300);pairing.authenticated(false);assert(std::string(pairing.state())=="failed");
+  std::cout<<"PASS: framing, ownership/lease, explicit pairing consent, stale reply rejection, timeout/wrap\n";
 }
