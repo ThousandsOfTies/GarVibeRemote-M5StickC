@@ -61,7 +61,7 @@ def main():
                '--lvgl', str(deps['lvgl']), '--json-library', str(deps['ArduinoJson']),
                '--app', str(app), '--config', str(app / 'lv_conf.h'),
                '--source', str(app.parent / 'touch-ui/vibe_jp_16.c'), '--app-api', 'minimal',
-               '--width', '240', '--height', '135', '--jobs', '4',
+               '--width', '135', '--height', '240', '--jobs', '4',
                '--output', str(ROOT / 'simulation/runtime'), '--cache', str(ROOT / '.cache/objects')]
     for name in EXPORTS:
         command += ['--export', 'gar_app_' + name]

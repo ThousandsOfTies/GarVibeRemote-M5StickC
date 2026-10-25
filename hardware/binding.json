@@ -3,6 +3,6 @@
   "product": "GarVibeRemote-M5StickC",
   "target_id": "esp32",
   "device": "m5stickc-plus2",
-  "display": {"width": 240, "height": 135, "orientation": "landscape", "touch": false},
+  "display": {"width": 135, "height": 240, "orientation": "portrait", "touch": false},
   "buttons": {"A": 37, "B": 39, "C": 35}
 }

@@ -10,27 +10,41 @@ try {
   const key=(k,type)=>device.shadowRoot.querySelector(`[data-key=${k}]`).dispatchEvent(new KeyboardEvent(type,{key:'Enter',bubbles:true,composed:true,cancelable:true}));
   const press=async(k,ms=30)=>{key(k,'keydown');await pause(ms);key(k,'keyup');await pause(30);};
   const scenario=name=>{const select=controls.shadowRoot.querySelector('select');select.value=name;select.dispatchEvent(new Event('change',{bubbles:true}));};
+  const action=id=>controls.shadowRoot.querySelector(`[data-control-id=${id}]`).click();
   const condition=(id,value)=>{const input=controls.shadowRoot.querySelector(`[data-control-id=${id}]`);input.checked=value;input.dispatchEvent(new Event('change',{bubbles:true}));};
-  await run('button component advances and reverses actual C++ pages',async()=>{
-    check(state().pages>1,'long question');await press('A');check(state().page===1,'next');await press('B');check(state().page===0,'previous');
+  await run('portrait display automatically scrolls while choices remain available',async()=>{
+    check(doc.querySelector('#screen').width===135&&doc.querySelector('#screen').height===240,'135 x 240');
+    check(device.getAttribute('orientation')==='portrait','physical orientation');
+    check(state().sessions.length===3,'three sessions');const before=state().scrollPixels;await pause(3200);
+    check(state().scrollPixels>before,'automatic scrolling');check(state().answerable,'choices available');
   });
-  await run('last page opens answers; short press cannot send; long press reaches mock PC',async()=>{
-    while(state().page+1<state().pages)await press('A');await press('A');check(state().answering,'answer mode');
-    await press('B');check(!state().pending,'short press');await press('A');check(state().choice===0,'YES selected');
-    await press('B',1000);await pause(600);check(state().pending==='yes'&&state().acknowledged,'round trip ack');
-    check(doc.querySelector('#answer').textContent.includes('YES'),'PC receipt visible');
+  await run('C cycles YES/NO and A short press reaches the correct mock PC session',async()=>{
+    scenario('short');check(state().choice===1,'NO default');await press('C');check(state().choice===0,'YES focus');
+    await press('A');await pause(600);check(state().pending==='yes'&&state().acknowledged,'round trip');
+    check(doc.querySelector('#answer').textContent.includes('YES'),'PC receipt');
   });
-  await run('new question during a hold cannot receive the previous answer',async()=>{
-    scenario('short');await press('A');key('B','keydown');await pause(1000);scenario('long');key('B','keyup');await pause(40);
-    check(!state().pending&&!state().answering&&state().page===0,'stale release discarded');
+  await run('B opens list, C rotates focus, A changes session without sending an answer',async()=>{
+    scenario('multi');await press('B');check(state().listOpen,'session list');await press('C');check(state().listFocus===1,'next focus');
+    await press('A');check(state().sessionId==='notes'&&!state().listOpen,'switch');check(state().pending==='','no phantom response');
   });
-  await run('disconnect cancels a held answer and reconnect keeps the question readable',async()=>{
-    scenario('short');await press('A');key('B','keydown');await pause(1000);condition('connected',false);key('B','keyup');
-    check(!state().connected&&!state().pending,'disconnected');condition('connected',true);check(state().connected&&!state().pending,'reconnected');
+  await run('background questions do not steal current session; all choice labels can be selected',async()=>{
+    const selected=state().sessionId;action('background');check(state().sessionId===selected,'selection preserved');
+    scenario('choices');check(state().actions.length===3,'three options');await press('C');await press('C');check(state().choice===2,'third option');
+    await press('A');await pause(600);check(state().pending==='stop'&&state().acknowledged,'third option response');
   });
-  await run('running state and power toggle are wired independently of scenario messages',async()=>{
-    scenario('running');check(state().state==='running','running');condition('powered',false);check(!state().powered&&!device.powered,'off');
-    condition('powered',true);check(state().powered&&device.powered,'on');scenario('long');
+  await run('replacement question and disconnect cancel A before release',async()=>{
+    scenario('short');key('A','keydown');action('resend');key('A','keyup');await pause(40);check(!state().pending,'new question guard');
+    key('A','keydown');condition('connected',false);key('A','keyup');check(!state().pending&&!state().connected,'disconnect guard');
+    condition('connected',true);check(state().connected,'reconnect');
+  });
+  await run('acknowledgement follows its original session after user switches away',async()=>{
+    scenario('multi');await press('A');await press('B');await press('C');await press('A');await pause(600);
+    check(state().sessionId==='notes'&&!state().acknowledged,'no foreign acknowledgement');
+    await press('B');await press('C');await press('C');await press('A');check(state().sessionId==='screen'&&state().acknowledged,'background receipt retained');
+  });
+  await run('power controls preserve passive LCD input',async()=>{
+    scenario('short');condition('powered',false);check(!state().powered&&!device.powered,'off');condition('powered',true);
+    doc.querySelector('#screen').dispatchEvent(new MouseEvent('click',{bubbles:true,composed:true}));check(!state().pending,'LCD click does nothing');scenario('multi');
   });
 } catch(e) {failed++;lines.push('FAIL startup: '+e.message);out.textContent=lines.join('\n');}
 out.dataset.failed=String(failed);out.dataset.complete='true';
