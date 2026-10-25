@@ -109,8 +109,8 @@ def doctor(path):
     report={'python':sys.version.split()[0],'node':bool(shutil.which('node')),'npm':bool(shutil.which('npm')),
             'git':bool(shutil.which('git')),'application':(APP/'src/codexBridge.ts').is_file(),
             'bridgeBuilt':runtime_ready(),'ports':ports,'portNote':note,
-            'deviceFirmware':'not-implemented','deviceTransport':'not-implemented','simulator':'local-mock',
-            'deviceInput':'not-connected'}
+            'deviceFirmware':'usb-test-source','deviceTransport':'usb-serial','bleTransport':'not-implemented','simulator':'local-mock',
+            'deviceInput':'not-checked'}
     if not path.exists():report['config']='missing'
     else:
         try:
@@ -155,7 +155,7 @@ def main(argv=None):
             if args.command=='setup':
                 settings.prepare_hooks(args.project,args.config,replace_product=args.replace_product)
                 print('Hook定義を準備しました。Codex側でレビュー・信頼してください。')
-            print('PC接続設定を準備しました（トークン非表示）。実機接続は未実装です。')
+            print('PC接続設定を準備しました（トークン非表示）。USB実機試験は実機版ガイドを確認してください。')
         elif args.command=='hooks':
             settings.prepare_hooks(args.project,args.config,replace_product=args.replace_product)
             print('Hook定義を準備しました。Codex側でレビュー・信頼してください。')

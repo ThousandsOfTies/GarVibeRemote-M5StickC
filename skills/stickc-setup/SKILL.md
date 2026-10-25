@@ -1,6 +1,6 @@
 ---
 name: stickc-setup
-description: Prepare or diagnose the Windows PC side of GarVibeRemote-M5StickC for M5StickC Plus2, including private settings, Codex hooks and the local status bridge. Use for installation or migration of its setup tools; physical BLE and firmware are not yet implemented.
+description: Set up or diagnose GarVibeRemote-M5StickC for M5StickC Plus2 on Windows, including PC settings, Codex hooks, the status bridge and USB test firmware. Use for installation or migration; BLE and live Codex-to-device integration are not yet implemented.
 ---
 
 # StickC setup
@@ -11,9 +11,19 @@ Read `docs/INSTALL.md` there for commands and the current completion criteria.
 
 Start with `python scripts/setup_remote.py doctor` from the Product root.
 It is read-only; report PC readiness separately from physical device readiness.
-The current simulator uses local mock data, and the new firmware/BLE transport
-and live multi-session bridge integration are not implemented. Do not promise
-device delivery or flash the old shared M5StickC client as this new UI.
+The simulator uses local mock data. USB test firmware shares its real LVGL UI,
+but BLE transport and live multi-session Codex bridge integration are not
+implemented. Do not flash the old shared M5StickC client as this new UI.
+
+For an explicit installation request, read `firmware/stickc-plus2/README.md`.
+Confirm the model is Plus2, using existing user confirmation when available;
+a CH9102 USB port alone does not identify the model. Use `scripts/firmware.py`
+to build, identify the USB device, save an 8MB flash backup and flash it.
+The installation request authorizes this replacement; no extra permission is
+needed once the target is known. Test the display, orientation and A/B/C with
+`scripts/serial_demo.py` using `.gar/firmware-tools` Python (includes pyserial).
+Only a received physical button response proves USB input. Synthetic sessions
+are connection tests, not user permission for files, tools or other operations.
 
 Use `prepare` for the isolated Node runtime and `configure --project PATH`
 for private settings. Retain existing tokens and session selections. To migrate
@@ -34,5 +44,5 @@ the PC. It is never a real user's YES/NO or permission for another action.
 
 Keep static HTTP serving, bridge operation and setup separate. Preserve the
 current work when diagnosing an unavailable connection. Do not configure
-Copilot or other AI clients, Bluetooth pairing, relay services or firmware as
-part of this PC setup skill.
+Copilot or other AI clients, Bluetooth pairing or relay services as part of
+the PC or USB test setup.

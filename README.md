@@ -1,7 +1,10 @@
 # GarVibeRemote-M5StickC
 
 M5StickC Plus2の小さな画面と物理ボタンで、エージェントの状態確認とYES／NO回答を行うProductです。
-**現在はWebシミュレータとPC側の導入支援までです。BLE・実機ファームウェア・新画面へのライブ接続は未実装です。**
+**Webシミュレータ、USB経由の実機試験版、PC側の導入支援があります。BLEと実Codexセッションへの接続は未実装です。**
+
+Plus2実機への書き込みとUSBでの操作確認は[実機版ガイド](firmware/stickc-plus2/README.md)を参照してください。
+実機版も同じLVGL画面・自動スクロール・セッション一覧・C／Aの選択と決定を使用します。
 
 PC側の準備・設定生成・Hook登録・診断は[Windows導入ガイド](docs/INSTALL.md)を参照してください。
 `python scripts/setup_remote.py prepare`で準備し、`test`でPC内の送受信を確認できます。
@@ -68,8 +71,10 @@ simulation/adapter.mjs  ── sessions / state / ack ──▶ C++ CompactUi (W
 入力は既存VibeRemoteの`state`形式と、全件を渡す`sessions`形式です。
 出力`uiAction`とackにはセッション・質問・回答IDを付け、別セッションの回答と照合します。
 16セッション・各8選択肢まで保持できます。形式の詳細は共有Appの`compact-ui/README.md`を参照してください。
-実際のPCブリッジとの接続時にはack契約と切断時の再同期処理を実装します。
-実セッションの自動収集、Bluetooth電波・電池寿命・実機の日本語可読性はまだ再現／確認していません。
+USB試験版はID付きackと8秒の接続期限で物理入力を確認できます。
+実際のCodexブリッジとの接続時には新しいack契約と切断時の再同期処理を接続します。
+USB実機で表示・自動スクロール・A/B/C操作・回答の往復を確認済みです。
+実セッションの自動収集、Bluetooth通信、長時間利用時の電池寿命は未確認です。
 初代StickC、StickC Plusの実機互換は保証しません。
 
 ## 確認

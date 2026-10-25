@@ -7,3 +7,4 @@ __pycache__/
 node_modules/
 .gar/
 .codex/hooks.json
+firmware/**/.pio/

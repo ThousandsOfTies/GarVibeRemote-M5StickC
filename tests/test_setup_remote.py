@@ -109,7 +109,8 @@ class SetupTests(unittest.TestCase):
             before=path.read_bytes();token=settings.read_config(path)['token']
             with patch.object(setup,'serial_ports',return_value=([],None)),patch.object(setup,'bridge_status',return_value={'state':'offline'}):
                 report=setup.doctor(path)
-            self.assertEqual(path.read_bytes(),before);self.assertEqual(report['deviceTransport'],'not-implemented')
+            self.assertEqual(path.read_bytes(),before);self.assertEqual(report['deviceTransport'],'usb-serial')
+            self.assertEqual(report['bleTransport'],'not-implemented');self.assertEqual(report['deviceInput'],'not-checked')
             serialized=json.dumps(report)
             for secret in (token,'private-session','private-label','watchInput'):self.assertNotIn(secret,serialized)
             self.assertEqual(report['hooks']['trust'],'not-checked')

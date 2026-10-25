@@ -3,9 +3,10 @@
 対象は **GarVibeRemote-M5StickC / M5StickC Plus2** です。旧Productの導入支援から、
 PCの設定生成・Hook登録・診断・通信試験を移植しました。Copilot監視は含めていません。
 
-現在準備できるのはPC側です。**縦画面用の実機ファームウェア、BLE通信、PCブリッジと
-新画面のセッション／ack契約の接続は未実装**です。既存の共有M5StickCファームウェアは
-この縦画面とは別実装なので、代わりに書き込みません。Webシミュレータは模擬PCのまま動きます。
+PC側の設定と、[縦画面用のUSB実機試験版](../firmware/stickc-plus2/README.md)を準備できます。
+**BLE通信、PCブリッジと新画面のセッション／ack契約の接続は未実装**です。
+既存の共有M5StickCファームウェアはこの縦画面とは別実装なので、代わりに書き込みません。
+WebシミュレータとUSB試験用の質問は、どちらも模擬セッションです。
 
 ## 最初の準備
 
@@ -81,7 +82,8 @@ python scripts/setup_remote.py ports
 `bridge.state: reachable`は認証付きHTTPでPCブリッジを読めたことを示します。
 `hooks.state: configured`は対象8イベントの送信定義があることだけを表し、
 `hooks.trust: not-checked`のとおりレビュー済みかは判定しません。
-`deviceFirmware`／`deviceTransport`は`not-implemented`、`deviceInput`は`not-connected`です。
+`deviceFirmware`は`usb-test-source`、`deviceTransport`は`usb-serial`、`bleTransport`は
+`not-implemented`です。`deviceInput: not-checked`は、この診断では物理入力を検査していないことを表します。
 
 `ports`はWindowsのUSB／Bluetoothポートを区別して列挙する診断機能です。
 COM番号だけから機種や送信方向、BLE接続の可否を判定しません。BLEはシリアルCOMと別の接続方式です。
@@ -97,7 +99,7 @@ COM番号だけから機種や送信方向、BLE接続の可否を判定しま�
 | authentication-error | 起動中のブリッジとPC設定の対応を確認する |
 | sessionMatches: false | 起動中の監視先が保存した設定と異なる |
 | hooks.state: missing / incomplete | `hooks --project`で定義を準備し、Codexでレビューする |
-| PC試験成功だが実機に表示されない | 現段階は実機通信と新UIへの接続が未実装 |
+| PC試験成功だが実機に表示されない | USB実機版の書き込みとserial_demoの起動を確認する。実Codexへの接続は未実装 |
 
 旧フォルダーを削除する前に、稼働中ブリッジ、Hook、旧スキルの参照先を確認します。
 この実装の移植だけでは、利用中の設定やサービスを勝手に切り替えません。
