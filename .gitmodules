@@ -1,0 +1,6 @@
+[submodule "sources/gar-vibe-ui"]
+	path = sources/gar-vibe-ui
+	url = https://github.com/ThousandsOfTies/gar-vibe-ui.git
+[submodule "sources/gar-tools"]
+	path = sources/gar-tools
+	url = https://github.com/ThousandsOfTies/gar-tools.git

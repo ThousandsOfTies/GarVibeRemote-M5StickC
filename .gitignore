@@ -1,0 +1,7 @@
+.cache/
+simulation/runtime/
+artifacts/
+__pycache__/
+*.pyc
+.env*
+node_modules/

@@ -1,0 +1,12 @@
+{
+  "lvgl": {
+    "version": "v7.11.0",
+    "url": "https://codeload.github.com/lvgl/lvgl/zip/refs/tags/v7.11.0",
+    "sha256": "8224df3f139f205b9ceeb1f1f6afedad1075949c2bab35abc22ebb7eda760708"
+  },
+  "ArduinoJson": {
+    "version": "v7.4.3",
+    "url": "https://codeload.github.com/bblanchon/ArduinoJson/zip/refs/tags/v7.4.3",
+    "sha256": "21c9f741ff47de55126c1736a3c19ff1d654da68d842eff0f924cd001b7ca043"
+  }
+}
