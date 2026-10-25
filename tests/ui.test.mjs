@@ -62,7 +62,7 @@ test('text scrolls at 9 px/s after initial pause, pauses at end, then loops',asy
   const travel=Math.ceil(maximum*1000/9);a.tick(travel-2000);assert.equal(a.state().scrollPixels,maximum);
   a.tick(2799);assert.equal(a.state().scrollPixels,maximum);a.tick(1);assert.equal(a.state().scrollPixels,0);
 });
-test('session names use muted state backgrounds and black glyphs, including list focus',async()=>{
+test('session names match state frame colors with black glyphs, including list focus',async()=>{
   const a=await app();
   const pixel=(x,y)=>{
     const start=a.m._gar_lv_framebuffer()+(y*135+x)*4;
@@ -78,23 +78,24 @@ test('session names use muted state backgrounds and black glyphs, including list
     for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)if(pixel(xx,yy).every(c=>c===0))count++;
     return count;
   };
-  const palette=[['waiting',0x9f6667],['running',0x5d976c],['idle',0x8b958e],['failed',0x9f6667],['done',0x8b958e]];
+  const palette=[['waiting',0x9c263b],['running',0x238a43],['idle',0x4d5552],['failed',0x9c263b],['done',0x4d5552]];
   for(const [state,color] of palette){
     const q=question();q.session.name='ABC';q.ui.state=state;a.receive(q);a.tick(50);
     colorAt(10,30,color);assert.ok(blackGlyphs(13,32,50,21)>20,`${state} has black name glyphs`);
     assert.equal(a.state().sessionNameBackground,color);assert.equal(a.state().sessionNameTextColor,0);
+    colorAt(2,120,color); // Actual name-band and frame pixels use the same color.
   }
   const states=palette.slice(0,3).map(([state],i)=>{
     const q=question(`s${i+1}`);q.session.name='ABC';q.ui.state=state;return q;
   });
-  a.receive(list(...states));a.press('B');a.tick(50);colorAt(10,30,0x8b958e);
+  a.receive(list(...states));a.press('B');a.tick(50);colorAt(10,30,0x4d5552);
   for(let i=0;i<3;i++){
     colorAt(14,64+i*37,palette[i][1]);
     assert.ok(blackGlyphs(34,66+i*37,50,21)>20,`list row ${i} has black name glyphs`);
   }
-  colorAt(10,70,0);colorAt(10,107,0x5d976c);
-  a.press('C');a.tick(50);colorAt(10,70,0x9f6667);colorAt(10,107,0);
-  a.hardware(true,false);a.tick(50);colorAt(10,30,0x8b958e);
+  colorAt(10,70,0);colorAt(10,107,0x238a43);
+  a.press('C');a.tick(50);colorAt(10,70,0x9c263b);colorAt(10,107,0);
+  a.hardware(true,false);a.tick(50);colorAt(10,30,0x4d5552);
 });
 test('short text stays still; identical status updates retain scroll and choice',async()=>{
   const a=await app(),q=question();a.receive(q);a.tick(5800);a.press('C');
