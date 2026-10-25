@@ -17,3 +17,12 @@ component Shadow DOM from the Product adapter.
 Commit and push shared repository changes first, then pin their commits here.
 Never commit tokens, local settings, generated WASM or dependency/build caches.
 Keep HTTP serving separate from build, device transports and AI-client setup.
+
+PC setup lives in scripts/setup_remote.py and scripts/remote_config.py; see
+docs/INSTALL.md and skills/stickc-setup/SKILL.md. The setup can build the shared
+PC bridge, but firmware/BLE and the new UI's live bridge integration remain
+unimplemented. PC loopback test replies are synthetic and never user approval.
+Do not import the old Copilot monitor or old hardware/interactive settings.
+Porting setup code does not authorize rewriting active hooks or restarting the
+user's running services. The explicit hooks command preserves unrelated entries;
+only --replace-product removes the named old sender. Hook trust is a user action.

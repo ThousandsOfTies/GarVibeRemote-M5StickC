@@ -1,7 +1,11 @@
 # GarVibeRemote-M5StickC
 
 M5StickC Plus2の小さな画面と物理ボタンで、エージェントの状態確認とYES／NO回答を行うProductです。
-**現在はWebシミュレータの初版です。BLE・実機ファームウェア・Codex接続は未実装です。**
+**現在はWebシミュレータとPC側の導入支援までです。BLE・実機ファームウェア・新画面へのライブ接続は未実装です。**
+
+PC側の準備・設定生成・Hook登録・診断は[Windows導入ガイド](docs/INSTALL.md)を参照してください。
+`python scripts/setup_remote.py prepare`で準備し、`test`でPC内の送受信を確認できます。
+`install-skill`で`$stickc-setup`を配置できます。Copilot監視は移植していません。
 
 ## 試す
 

@@ -5,3 +5,5 @@ __pycache__/
 *.pyc
 .env*
 node_modules/
+.gar/
+.codex/hooks.json

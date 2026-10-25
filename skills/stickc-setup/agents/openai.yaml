@@ -1,0 +1,4 @@
+interface:
+  display_name: "StickC Setup"
+  short_description: "Prepare M5StickC Plus2 PC setup and diagnose connections"
+  default_prompt: "Use $stickc-setup to prepare or diagnose this M5StickC Plus2 Product's PC connection setup."
