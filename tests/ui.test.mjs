@@ -28,6 +28,33 @@ test('portrait LVGL framebuffer renders full UTF-8 text with only line breaks in
   const start=a.m._gar_lv_framebuffer(),pixels=a.m.HEAPU8.slice(start,start+135*240*4);
   assert.ok(new Set(pixels).size>5); // Actual LVGL output, not a JavaScript mock.
 });
+test('state frame renders on every side inside a black LCD margin, including list and disconnect',async()=>{
+  const a=await app();
+  const pixel=(x,y)=>{
+    const p=a.m._gar_lv_framebuffer()+(y*135+x)*4;
+    return [...a.m.HEAPU8.slice(p,p+3)];
+  };
+  const rgb565=hex=>{
+    const r=(hex>>19)&31,g=(hex>>10)&63,b=(hex>>3)&31;
+    return [(r<<3)|(r>>2),(g<<2)|(g>>4),(b<<3)|(b>>2)];
+  };
+  // LVGL's integer RGB565 expansion may differ by one from bit replication.
+  const colorAt=(x,y,color,description='frame')=>{
+    const expected=rgb565(color),actual=pixel(x,y);
+    assert.ok(actual.every((channel,i)=>Math.abs(channel-expected[i])<=1),`${description} at ${x},${y}: ${actual} vs ${expected}`);
+  };
+  for(const [state,color] of [['waiting',0x9c263b],['running',0x238a43],['idle',0x4d5552]]){
+    const q=question();q.ui.state=state;a.receive(q);a.tick(50);
+    assert.equal(a.state().frameWidth,4);assert.equal(a.state().frameInset,2);
+    for(const [x,y] of [[2,2],[2,120],[5,120],[132,120],[67,2],[67,237]])
+      colorAt(x,y,color,`${state} border`);
+    for(const [x,y] of [[0,120],[1,120],[6,120],[134,120],[67,0],[67,239]])
+      colorAt(x,y,0x090e0d,`${state} black margin`);
+  }
+  a.receive(question());a.press('B');a.tick(50);colorAt(2,120,0x9c263b);
+  a.hardware(true,false);a.tick(50);assert.equal(a.state().frameColor,0x4d5552);
+  colorAt(2,120,0x4d5552);
+});
 test('text scrolls at 9 px/s after initial pause, pauses at end, then loops',async()=>{
   const a=await app();a.receive(question());a.tick(1800);assert.equal(a.state().scrollPixels,0);
   a.tick(1000);assert.equal(a.state().scrollPixels,9);a.tick(1000);assert.equal(a.state().scrollPixels,18);
