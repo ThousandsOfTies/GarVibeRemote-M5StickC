@@ -6,7 +6,8 @@ PCの設定生成・Hook登録・診断・通信試験を移植しました。Co
 PC側の設定と、[縦画面用のSPP／USB実機版](../firmware/stickc-plus2/README.md)を準備できます。
 既存PCブリッジと新画面のセッション／ack契約はデバイス中継で接続します。BLEは未実装です。
 既存の共有M5StickCファームウェアはこの縦画面とは別実装なので、代わりに書き込みません。
-WebシミュレータとUSB試験用の質問は、どちらも模擬セッションです。
+通常のWebシミュレータとUSB試験用の質問は模擬セッションです。
+`simulator-feed`と`?live=1`を使うと、Webシミュレータでも実機と同じ本番状態を閲覧できます。
 
 ## 最初の準備
 
@@ -20,7 +21,8 @@ python scripts/setup_remote.py test
 python scripts/setup_remote.py install-skill
 ```
 
-`prepare`は固定した依存関係を`.gar/connection-node`へ導入し、共有AppのPCブリッジとデバイス中継をビルドします。
+`prepare`は固定した依存関係を`.gar/connection-node`内のバージョン別フォルダーへ導入し、共有AppのPCブリッジと中継をビルドします。
+同じ依存関係の準備が済んでいれば再利用し、稼働中のBluetooth中継が使うファイルを削除しません。
 共有Appの開発用node_modulesやシミュレータは変更しません。
 `test`の`status: passed`と`scope: pc-loopback`は、PC内の認証・状態配信・質問／回答の試験です。
 仮のクライアントが回答するので、実機接続や本人の承認を意味しません。

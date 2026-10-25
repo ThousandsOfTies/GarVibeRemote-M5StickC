@@ -17,7 +17,8 @@ import urllib.request
 ROOT=Path(__file__).resolve().parents[1]
 APP=ROOT/'sources/gar-vibe-ui/vibe-remote'
 CONFIG=ROOT/'artifacts/connection/local.json'
-RUNTIME=ROOT/'.gar/connection-node'
+DEPENDENCY_HASH=hashlib.sha256((ROOT/'config/connection-node/package-lock.json').read_bytes()).hexdigest()
+RUNTIME=ROOT/'.gar/connection-node'/DEPENDENCY_HASH[:16]
 spec=importlib.util.spec_from_file_location('remote_config',ROOT/'scripts/remote_config.py')
 settings=importlib.util.module_from_spec(spec);spec.loader.exec_module(settings)
 SetupError=settings.SetupError
@@ -26,13 +27,13 @@ def source_hash():
     digest=hashlib.sha256()
     files=[APP/'src'/name for name in ('codexBridge.ts','codexInteraction.ts','codexStatus.ts','protocol.ts')]
     files+=[ROOT/'config/connection-node/package-lock.json']
-    files+=[ROOT/'scripts/device_bridge.cjs']
+    files+=[ROOT/'scripts/device_bridge.cjs',ROOT/'scripts/simulator_feed.cjs']
     for path in files:digest.update(path.name.encode());digest.update(path.read_bytes())
     return digest.hexdigest()
 
 def runtime_ready():
     try:
-        return all((RUNTIME/name).is_file() for name in ('codexBridge.cjs','deviceBridge.cjs','node_modules/ws/package.json','node_modules/serialport/package.json')) and json.loads((RUNTIME/'build.json').read_text())['sourceHash']==source_hash()
+        return all((RUNTIME/name).is_file() for name in ('codexBridge.cjs','deviceBridge.cjs','simulatorFeed.cjs','node_modules/ws/package.json','node_modules/serialport/package.json')) and json.loads((RUNTIME/'build.json').read_text())['sourceHash']==source_hash()
     except (OSError,ValueError,KeyError):return False
 
 def run(command,*,cwd=ROOT,capture=False):
@@ -51,13 +52,18 @@ def prepare_dependencies():
     if int(version.lstrip('v').split('.')[0])<24:raise SetupError('Node.js 24以降が必要です。')
     RUNTIME.mkdir(parents=True,exist_ok=True)
     for name in ('package.json','package-lock.json'):shutil.copyfile(ROOT/'config/connection-node'/name,RUNTIME/name)
-    run([npm,'ci','--omit=dev','--no-audit','--no-fund'],cwd=RUNTIME)
+    marker=RUNTIME/'dependencies.sha256'
+    complete=all((RUNTIME/'node_modules'/name/'package.json').is_file() for name in ('esbuild','ws','serialport'))
+    if not complete or not marker.is_file() or marker.read_text().strip()!=DEPENDENCY_HASH:
+        run([npm,'ci','--omit=dev','--no-audit','--no-fund'],cwd=RUNTIME)
+        marker.write_text(DEPENDENCY_HASH+'\n',encoding='utf-8')
     build=("require(process.argv[1]).buildSync({entryPoints:[process.argv[2]],outfile:process.argv[3],"
            "nodePaths:[process.argv[4]],alias:{ws:process.argv[4]+'/ws'},bundle:true,"
            "platform:'node',format:'cjs',target:'node24',logLevel:'info'})")
     run([node,'-e',build,RUNTIME/'node_modules/esbuild',APP/'src/codexBridge.ts',RUNTIME/'codexBridge.cjs',RUNTIME/'node_modules'])
     device_build=build.replace("bundle:true,","bundle:true,external:['serialport'],")
     run([node,'-e',device_build,RUNTIME/'node_modules/esbuild',ROOT/'scripts/device_bridge.cjs',RUNTIME/'deviceBridge.cjs',RUNTIME/'node_modules'])
+    run([node,'-e',device_build,RUNTIME/'node_modules/esbuild',ROOT/'scripts/simulator_feed.cjs',RUNTIME/'simulatorFeed.cjs',RUNTIME/'node_modules'])
     (RUNTIME/'build.json').write_text(json.dumps({'sourceHash':source_hash()})+'\n',encoding='utf-8')
 
 def classify_ports(items):
@@ -139,6 +145,7 @@ def main(argv=None):
     parser.add_argument('--config',type=Path,default=CONFIG)
     commands=parser.add_subparsers(dest='command',required=True)
     for name in ('doctor','ports','prepare','bridge','test'):commands.add_parser(name)
+    sub=commands.add_parser('simulator-feed');sub.add_argument('--port',type=int,default=8775);sub.add_argument('--panel-port',type=int,default=8772)
     for name in ('device','device-test'):
         sub=commands.add_parser(name);sub.add_argument('--port',required=True);sub.add_argument('--transport',required=True,choices=['usb','spp'])
     for name in ('configure','setup'):
@@ -169,6 +176,10 @@ def main(argv=None):
             node=shutil.which('node')
             if not node or not runtime_ready():raise SetupError('prepareでNode.jsの実行環境を先に準備してください。')
             if args.command=='test':run([node,ROOT/'scripts/connection_test.cjs',RUNTIME])
+            elif args.command=='simulator-feed':
+                settings.read_config(args.config)
+                if not all(1<=p<=65535 for p in (args.port,args.panel_port)):raise SetupError('接続ポートは1〜65535で指定してください。')
+                run([node,RUNTIME/'simulatorFeed.cjs','--config',args.config.resolve(),'--port',str(args.port),'--panel-port',str(args.panel_port)])
             elif args.command in ('device','device-test'):
                 ports,_=serial_ports();kind='bluetooth' if args.transport=='spp' else 'usb'
                 if os.name=='nt' and not any(p['port']==args.port.upper() and p['kind']==kind for p in ports):

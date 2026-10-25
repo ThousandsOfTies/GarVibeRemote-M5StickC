@@ -4,19 +4,23 @@
 <title>VibeRemote · M5StickC Plus2</title><link rel="stylesheet" href="./style.css"></head>
 <body>
 <main>
-  <header><h1>M5StickC シミュレータ <span class="model">Plus2</span></h1><p>本体のボタンで、状態確認とYES／NOを試せます。</p></header>
+  <header><h1>M5StickC シミュレータ <span class="model">Plus2</span></h1><p id="intro">本体のボタンで、状態確認とYES／NOを試せます。</p></header>
   <section class="workbench" aria-label="M5StickC Plus2 simulator">
-    <div class="bench-top"><span><i></i>ローカル試験</span><span>135 × 240 · 縦画面</span></div>
+    <div class="bench-top"><span><i></i><span id="mode-label">ローカル試験</span></span><span>135 × 240 · 縦画面</span></div>
     <div class="device-space"><gar-stickc-plus2 id="device" orientation="portrait" powered="true" label="VibeRemote M5StickC Plus2"><canvas slot="display" id="screen" width="135" height="240" inert aria-label="VibeRemote screen"></canvas></gar-stickc-plus2></div>
-    <div class="guide"><span><kbd>A</kbd><b>決定</b></span><span><kbd>B</kbd><b>セッション一覧 / 戻る</b></span><span><kbd>C</kbd><b>次の項目へ</b></span></div>
+    <div class="guide"><span><kbd>A</kbd><b id="a-guide">決定</b></span><span><kbd>B</kbd><b>セッション一覧 / 戻る</b></span><span><kbd>C</kbd><b>次の項目へ</b></span></div>
     <p class="note">本体のボタンをクリック。フォーカス中は A・B・C キーでも操作できます。液晶はタッチ非対応です。</p>
   </section>
   <aside>
-    <section class="card"><div class="section-label">SCENARIOS</div><h2>画面を試す</h2>
+    <section class="card" id="live-panel" hidden><div class="section-label">LIVE</div><h2>Codexの本番データ</h2>
+      <gar-connection-status id="live-status" connected-label="Codexの状態を受信中" disconnected-label="接続待ち"></gar-connection-status>
+      <p class="note">実機と同じPCブリッジから状態を受信します。この画面は閲覧用です。回答は実機から行ってください。</p>
+    </section>
+    <section class="card" id="scenario-panel"><div class="section-label">SCENARIOS</div><h2>画面を試す</h2>
       <gar-sim-controls id="scenarios"></gar-sim-controls>
       <p class="note">本文は自動スクロールします。Cで回答を選び、Aで決定。Bでセッション一覧を開き、Cで順番に選んでAで切り替えます。</p>
     </section>
-    <section class="card result" aria-live="polite"><div class="section-label">ROUND TRIP</div><h2>回答の受信結果</h2><p id="answer">まだ回答していません</p><p class="note">このページ内の模擬PCで受信・応答します。実際のCodexやBLEには接続していません。</p></section>
+    <section class="card result" aria-live="polite"><div class="section-label">ROUND TRIP</div><h2 id="result-heading">回答の受信結果</h2><p id="answer">まだ回答していません</p><p class="note" id="answer-note">このページ内の模擬PCで受信・応答します。実際のCodexやBLEには接続していません。</p></section>
   </aside>
   <details class="diagnostics"><summary>画面の状態とイベント</summary><pre id="snapshot"></pre><gar-event-log id="log" max-entries="60" label="イベント" clear-label="消去" empty-label="イベントはありません"></gar-event-log></details>
   <footer><span>M5StickC Plus2 / LVGL 7</span><span>同じ C++ の描画・入力処理を WASM で実行</span></footer>

@@ -11,7 +11,10 @@ Read `docs/INSTALL.md` there for commands and the current completion criteria.
 
 Start with `python scripts/setup_remote.py doctor` from the Product root.
 It is read-only; report PC readiness separately from physical device readiness.
-The simulator uses local mock data. SPP/USB firmware shares its real LVGL UI.
+The default simulator uses local mock data. For simultaneous live viewing,
+run `simulator-feed` separately from static HTTP and open `?live=1` on the panel.
+The feed is read-only, validates the local page origin and keeps tokens on the PC.
+SPP/USB firmware shares its real LVGL UI.
 The existing Codex bridge sends one selected (or latest observed) session;
 automatic live multi-session collection and BLE are not implemented.
 Do not flash the old shared M5StickC client as this portrait UI.

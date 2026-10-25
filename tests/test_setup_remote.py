@@ -8,6 +8,7 @@ from pathlib import Path
 import tempfile
 import threading
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -194,5 +195,24 @@ class SetupTests(unittest.TestCase):
             with patch.object(setup,'runtime_ready',return_value=True),patch.object(setup,'serial_ports',return_value=([{'port':'COM9','kind':'bluetooth'}],None)),patch.object(setup,'run') as run:
                 self.assertEqual(setup.main(['--config',str(config),'device-test','--port','COM9','--transport','spp']),0)
             self.assertFalse(config.exists());self.assertNotIn('--config',run.call_args.args[0])
+
+    def test_simulator_feed_uses_private_config_and_independent_ports_without_hooks_or_device_operations(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);config=root/'config.json';settings.configure(config,project=root)
+            with patch.object(setup,'runtime_ready',return_value=True),patch.object(setup,'run') as run,patch.object(settings,'prepare_hooks') as hooks:
+                self.assertEqual(setup.main(['--config',str(config),'simulator-feed','--port','8775','--panel-port','8772']),0)
+            command=run.call_args.args[0];self.assertIn('8775',command);self.assertIn('8772',command)
+            self.assertNotIn(settings.read_config(config)['token'],str(command));hooks.assert_not_called()
+
+    def test_repeat_preparation_does_not_reinstall_in_use_native_serial_dependencies(self):
+        with tempfile.TemporaryDirectory() as folder:
+            runtime=Path(folder)
+            for name in ('esbuild','ws','serialport'):
+                package=runtime/'node_modules'/name/'package.json';package.parent.mkdir(parents=True);package.write_text('{}')
+            with patch.object(setup,'RUNTIME',runtime),patch.object(setup,'run',return_value=SimpleNamespace(stdout='v24.0.0')) as run:
+                setup.prepare_dependencies()
+                self.assertEqual(sum('ci' in call.args[0] for call in run.call_args_list),1)
+                run.reset_mock();setup.prepare_dependencies()
+                self.assertEqual(sum('ci' in call.args[0] for call in run.call_args_list),0)
 
 if __name__=='__main__':unittest.main()

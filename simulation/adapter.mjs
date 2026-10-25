@@ -1,7 +1,9 @@
 import '/gar-components/m5stickc-plus2.mjs';
 import '/gar-components/controls.mjs';
 import '/gar-components/event-log.mjs';
+import '/gar-components/connection-status.mjs';
 import { LvglSurface } from '/gar-components/lvgl-surface.mjs';
+import { JsonTransport } from '/gar-components/json-transport.mjs';
 
 const device = document.querySelector('#device');
 const controls = document.querySelector('#scenarios');
@@ -9,6 +11,9 @@ const log = document.querySelector('#log');
 const answer = document.querySelector('#answer');
 const debug = document.querySelector('#snapshot');
 const states = new Map(), receipts = new Map();
+const params=new URLSearchParams(location.search),liveMode=params.get('live')==='1';
+const liveConnection=new EventTarget();liveConnection.connected=false;
+let liveTransport;
 const longQuestion = '画面の変更とテストが完了しました。修正した内容を確認してから、次の作業へ進めてもよいですか？本文はゆっくり自動スクロールします。読み終えたらCでYESまたはNOにフォーカスを合わせ、Aで決定してください。ほかのセッションを確認するときはBで一覧を開き、Cで順番に選び、Aで切り替えます。今回は接続試験なので、PCのファイルや設定は変更しません。';
 const yesNo = [{id:'yes',label:'YES',button:'A'}, {id:'no',label:'NO',button:'B'}];
 const choices = [{id:'continue',label:'続ける',button:'A'}, {id:'revise',label:'修正する',button:'B'}, {id:'stop',label:'中止する',button:'C'}];
@@ -29,7 +34,7 @@ controls.schema = [
 ];
 function receive(message) {
   ui.receive(message);
-  log.append(`模擬PC → 本体：${message.type}${message.session ? ` / ${message.session.name}` : ''}`);
+  log.append(`${liveMode?'Codex':'模擬PC'} → 本体：${message.type}${message.session ? ` / ${message.session.name}` : ''}`);
 }
 function acknowledge(receipt) {
   const { sessionId, uiId, actionId } = receipt;
@@ -41,11 +46,47 @@ function acknowledge(receipt) {
   receipts.delete(receipt.key);
 }
 function hardware() {
-  const { powered, connected } = controls.values;
+  const { powered } = controls.values;
+  const connected=liveMode?liveConnection.connected:controls.values.connected;
   device.powered = powered;
   ui.hardware({ powered, connected, battery:82 });
   ui.element.inert = true;
   for (const receipt of receipts.values()) if (receipt.ready) acknowledge(receipt);
+}
+function liveConnected(connected) {
+  if(liveConnection.connected===connected)return;
+  liveConnection.connected=connected;
+  liveConnection.dispatchEvent(new CustomEvent('connection',{detail:{connected}}));hardware();
+}
+function startLive() {
+  document.querySelector('#scenario-panel').hidden=true;
+  document.querySelector('#live-panel').hidden=false;
+  document.querySelector('#mode-label').textContent='Codex 本番データ';
+  document.querySelector('#intro').textContent='実機と同じCodexの状態を表示します。';
+  document.querySelector('#a-guide').textContent='一覧で決定';
+  document.querySelector('#live-status').source=liveConnection;
+  document.querySelector('#result-heading').textContent='本番表示';
+  document.querySelector('.result .section-label').textContent='STATUS';
+  document.querySelector('#answer-note').textContent='Bでセッション一覧を確認できます。YES／NOの回答は実機から行ってください。';
+  answer.textContent='本番データの接続を待っています。';
+  const port=Number(params.get('livePort') || 8775);
+  if(!Number.isInteger(port) || port<1 || port>65535)throw Error('Invalid live feed port');
+  // Fixed loopback destination; no credential or remote endpoint in the page.
+  liveTransport=new JsonTransport({url:`ws://127.0.0.1:${port}/state`});
+  liveTransport.addEventListener('connection',({detail})=>{
+    if(!detail.connected){liveConnected(false);answer.textContent='本番データとの接続が切れました。再接続を待っています。';}
+  });
+  liveTransport.addEventListener('message',({detail})=>{
+    if(detail.type==='connection') {
+      liveConnected(detail.connected===true);
+      if(!detail.connected)answer.textContent='PCブリッジとの接続を待っています。';
+    } else if(detail.type==='sessions' && Array.isArray(detail.sessions)) {
+      states.clear();for(const entry of detail.sessions)states.set(entry.session.id,entry);
+      liveConnected(true);receive(detail);
+      answer.textContent='実機と同じCodexの状態を表示しています。';
+    }
+  });
+  liveTransport.connect();
 }
 function state(id, name, status, message, actions = []) {
   return {type:'state',session:{id,name},agent:{status,message},
@@ -101,6 +142,7 @@ async function start() {
   ui = new LvglSurface(module,document.querySelector('#screen'),{adapter});
   ui.element.inert = true;
   ui.addEventListener('action',({detail}) => {
+    if(liveMode)return; // The feed never sends browser answers upstream.
     const source = states.get(detail.sessionId);
     const action = source?.ui.actions.find(action => action.id === detail.actionId);
     if (!source || source.ui.id !== detail.uiId || !action) { log.append('期限切れの回答を破棄しました'); return; }
@@ -113,6 +155,10 @@ async function start() {
   });
   device.addEventListener('gar-button',({detail}) => {
     const {button,phase,durationMs} = detail;ui.advanceClock();
+    if(liveMode && button==='A' && !ui.snapshot.listOpen) {
+      if(phase==='up')answer.textContent='この画面は閲覧用です。回答は実機から行ってください。';
+      return;
+    }
     if (button === 'C' && phase === 'up' && durationMs >= (device.powered ? 6000 : 2000)) {
       controls.values = {powered:!device.powered};hardware();
     } else {
@@ -125,13 +171,13 @@ async function start() {
     if (detail.id === 'background') backgroundQuestion();
     if (detail.id === 'connected' || detail.id === 'powered') hardware();
   });
-  hardware();scenario('multi');
+  hardware();if(liveMode)startLive();else scenario('multi');
   const timer = setInterval(() => {
     debug.textContent = JSON.stringify(ui.snapshot,null,2);
     document.querySelector('#screen').setAttribute('aria-label',ui.snapshot.label);
   },150);
   window.addEventListener('pagehide',() => {
-    clearInterval(timer);for (const receipt of receipts.values()) clearTimeout(receipt.timer);ui.destroy();
+    clearInterval(timer);liveTransport?.close();for (const receipt of receipts.values()) clearTimeout(receipt.timer);ui.destroy();
   },{once:true});
   window.vibeSimulator = Object.freeze({snapshot:() => structuredClone(ui.snapshot)});
 }

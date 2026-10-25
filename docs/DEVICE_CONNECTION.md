@@ -75,6 +75,21 @@ Copilot監視や旧T-Watchのファームウェア／対話設定は取り込み
 
 ## 通信と再接続
 
+実機と同時にWebシミュレータへ本番データを表示する場合は、HTTP配信とは別のプロセスを起動します。
+
+```powershell
+python scripts/simulate.py --port 8772
+# 別の端末:
+python scripts/setup_remote.py simulator-feed
+# http://127.0.0.1:8772/?live=1 を開く
+```
+
+`simulator-feed`はlocalhost:8775の閲覧専用WebSocketで、8772のページからの接続だけを受け付けます。
+トークンはPC内で使い、配信ファイル・URL・ブラウザには渡しません。実機のSPP中継と同時に状態を購読できます。
+本番表示のAは回答を送らず、PC側の中継もブラウザからのメッセージを転送しません。
+本番へのYES／NOは実機から行います。通常のURLは従来の模擬試験です。
+ポートを変える場合は`simulator-feed --port PORT --panel-port HTTP_PORT`と、URLの`livePort=PORT`を対応させます。
+
 - USBもSPPもUTF-8のJSON Linesです。改行を除き1行64KiBまで。受信の区切りが日本語の途中でも処理します。
 - `hello` → `deviceInfo`で機種・画面・プロトコル・通信方式を確認してから状態を送ります。
 - `state`／`sessions`は状態、`uiAction`は回答、`ack`はセッション・質問・回答ID付きの受領確認です。

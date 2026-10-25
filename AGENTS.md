@@ -25,6 +25,9 @@ backs up and flashes the confirmed Plus2; scripts/serial_demo.py tests physical
 input over USB. scripts/device_bridge.cjs connects the existing selected-session
 Codex bridge over SPP or USB; device_trial.cjs is an isolated physical test.
 BLE and automatic collection of multiple live sessions remain unimplemented.
+scripts/simulator_feed.cjs is a separate read-only localhost WebSocket feed for
+the ?live=1 panel. Keep private tokens out of public assets, URLs and browsers;
+browser input must not become a real approval. Static serving stays separate.
 PC loopback test replies are synthetic and never user approval.
 Do not import the old Copilot monitor or old hardware/interactive settings.
 Porting setup code does not authorize rewriting active hooks or restarting the

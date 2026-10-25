@@ -26,6 +26,9 @@ python scripts/simulate.py --port 8772
 ```
 
 [シミュレータを開く](http://127.0.0.1:8772/)。UIソース変更後は再ビルドしてページを再読み込みします。
+実機と同じCodexの本番状態を表示する場合は、別端末で`python scripts/setup_remote.py simulator-feed`を起動し、
+[本番表示](http://127.0.0.1:8772/?live=1)を開きます。閲覧専用で、回答は実機から行います。
+接続トークンはPC内の中継だけで使います。試験データの画面は通常のURLで引き続き使用できます。
 依存ライブラリは`dependencies.json`のバージョン・SHA256で検証して取得し、`.cache`へ保存します。
 生成WASMは`simulation/runtime`に置き、Gitには含めません。
 
@@ -85,6 +88,7 @@ USB実機で表示・自動スクロール・A/B/C操作・回答の往復を確
 ```powershell
 node --test tests/ui.test.mjs
 node --test tests/device_bridge.test.cjs
+node --test tests/simulator_feed.test.cjs
 python -m unittest discover -s tests -p 'test_*.py' -v
 # Emscripten有効時の通信部品テスト（生成先は.cache内）
 em++ -std=c++17 -Ifirmware/stickc-plus2/include tests/device_link.cpp -sSINGLE_FILE=1 -sENVIRONMENT=node -sEXIT_RUNTIME=1 -o .cache/device-link-test.cjs
