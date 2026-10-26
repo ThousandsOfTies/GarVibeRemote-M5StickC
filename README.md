@@ -59,7 +59,7 @@ git submodule update --init --recursive
 ```
 
 submoduleはProductで固定したコミットを使い、導入のために`--remote`で更新しません。
-共有リポジトリのブランチ名に`simulator`が残っていても、実機かシミュレータかを選ぶ設定ではありません。
+共有UIの変更は`gar-vibe-ui`の`main`へ統合しています。
 実機のビルド対象は本Productの`firmware/stickc-plus2/platformio.ini`です。
 最初に次を読みます。スキルをまだインストールしていなくても、リポジトリ内のファイルを直接読めます。
 
