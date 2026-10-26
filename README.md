@@ -37,9 +37,9 @@ USBケーブルの接続、ペアリングの番号照合、Hookのレビュー�
 | ケーブル | 給電だけでなく**データ通信に対応したUSBケーブル** |
 | PCのツール | Git、Python 3.10以上、Node.js 24以上とnpm、インターネット接続 |
 | 監視対象 | ローカルで動くCodex。チャットの選択式質問連携はCodex Appを使用 |
-| ソースの取得 | 本リポジトリと、[gar-vibe-ui](https://github.com/ThousandsOfTies/gar-vibe-ui)、[gar-tools](https://github.com/ThousandsOfTies/gar-tools)を取得できるGitHubのアクセス権 |
+| ソースの取得 | 本リポジトリと、公開submoduleの[gar-vibe-ui](https://github.com/ThousandsOfTies/gar-vibe-ui)、[gar-tools](https://github.com/ThousandsOfTies/gar-tools)をGitHubから取得できること |
 
-共有ソースはsubmoduleです。取得できなければ配布者にアクセス権を確認してください。
+共有ソースは公開submoduleです。`--recurse-submodules`で一緒に取得します。
 導入時にPlatformIOやVS Codeを別途セットアップする必要はありません。ファームウェアのビルドに必要なツールはスクリプトが専用環境へ準備します。
 
 ## 導入を担当するAIへ
@@ -70,7 +70,7 @@ submoduleはProductで固定したコミットを使い、導入のために`--r
 - [SPP／USB接続ガイド](docs/DEVICE_CONNECTION.md)：ペアリング、中継、チャットの質問連携。
 
 Git・Python・Node.js・npmの有無とバージョンを確認し、不足があれば必要な名前とバージョンを説明して準備します。
-GitHubの取得権限や本人のサインインが不足している場合は、その操作を案内してから続けます。
+GitHubからの取得に失敗した場合は、ネットワーク接続とsubmoduleの取得状況を確認します。
 
 以降のコマンドは**このリポジトリのルート**で実行します。PowerShellの変数は、次のように現地で確認した値を設定してから使います。
 作者のPCのパス、COM番号、チャットIDをコピーしないでください。
@@ -234,7 +234,7 @@ BLE、Copilot／Claudeなど他クライアント専用の連携、長時間利�
 ## 開発者向け：Webシミュレータ
 
 ここからは開発・UI確認用です。通常の実機導入では省略します。
-Python 3.10以上、Node.js 24以上、Emscriptenが必要です。cloneには共有リポジトリへのアクセス権が必要です。
+Python 3.10以上、Node.js 24以上、Emscriptenが必要です。共有リポジトリもsubmoduleとして取得します。
 
 ```powershell
 git clone --recurse-submodules https://github.com/ThousandsOfTies/GarVibeRemote-M5StickC.git
@@ -354,3 +354,11 @@ PC側の試験は隔離した設定・仮の接続を使い、設定検証、起
 
 ハードウェア参照：[M5Stack公式 StickC Plus2](https://docs.m5stack.com/en/core/StickC-Plus2)。
 共通ソースはsubmoduleです。変更時は共有リポジトリを先にコミット・プッシュし、そのコミットをこのProductで固定します。
+
+## ライセンス
+
+本リポジトリの独自コードと文書は[MIT License](LICENSE)です。
+著作権表示とライセンス文を残す条件で、使用・改変・再配布・商用利用を認めます。
+
+submoduleと依存ライブラリには、それぞれの利用条件が適用されます。本体のMITをそれらへ上書きしません。
+日本語フォントのデータは[SIL Open Font License 1.1](sources/gar-vibe-ui/vibe-remote/touch-ui/OFL.txt)です。
