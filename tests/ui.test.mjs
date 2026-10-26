@@ -93,8 +93,8 @@ test('session names match state frame colors with black glyphs, including list f
     colorAt(14,64+i*37,palette[i][1]);
     assert.ok(blackGlyphs(34,66+i*37,50,21)>20,`list row ${i} has black name glyphs`);
   }
-  colorAt(10,70,0);colorAt(10,107,0x238a43);
-  a.press('C');a.tick(50);colorAt(10,70,0x9c263b);colorAt(10,107,0);
+  colorAt(10,70,0xffffff);colorAt(10,107,0x238a43);
+  a.press('C');a.tick(50);colorAt(10,70,0x9c263b);colorAt(10,107,0xffffff);
   a.hardware(true,false);a.tick(50);colorAt(10,30,0x4d5552);
 });
 test('lost acknowledgement does not leave the UI pending or replay an answer on reconnect',async()=>{
