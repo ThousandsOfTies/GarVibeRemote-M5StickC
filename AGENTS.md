@@ -28,6 +28,12 @@ BLE and automatic collection of multiple live sessions remain unimplemented.
 scripts/simulator_feed.cjs is a separate read-only localhost WebSocket feed for
 the ?live=1 panel. Keep private tokens out of public assets, URLs and browsers;
 browser input must not become a real approval. Static serving stays separate.
+scripts/chat_questions.cjs separately mirrors selected local Codex App asynchronous
+choice cards and returns actual physical selections to that same card/chat through
+App Tools. See docs/DEVICE_CONNECTION.md. Do not synthesize human answers, forward
+tool approvals, replay uncertain deliveries or automate the Codex desktop UI.
+Its rollout/App Tools compatibility is version-specific; free text and synchronous
+request_user_input stay on the PC. It changes no hook definitions or trust records.
 PC loopback test replies are synthetic and never user approval.
 Do not import the old Copilot monitor or old hardware/interactive settings.
 Porting setup code does not authorize rewriting active hooks or restarting the

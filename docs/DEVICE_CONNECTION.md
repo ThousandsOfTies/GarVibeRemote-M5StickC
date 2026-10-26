@@ -73,6 +73,50 @@ python scripts/setup_remote.py --config "PRIVATE_CONFIG_PATH" device --port COM_
 長押しを要求する既存の承認UIは短押しAで承認せず、「PCで承認してください」と表示します。
 Copilot監視や旧T-Watchのファームウェア／対話設定は取り込みません。
 
+## 4. このチャットの選択式質問を実機へ通知する
+
+通常のチャットで出す質問と、ツール実行の承認は別経路です。質問連携を有効にすると、
+Codex Appの`request_user_input_async`が表示した選択肢をPlus2へ自動転送します。
+Cで選び、Aで決定すると、元の質問IDと元の選択肢の文字列を使って同じチャットへ回答します。
+質問が複数なら一問ずつ表示します。長い選択肢は本文にも番号付きで表示し、自動スクロールで読めます。
+
+```powershell
+python scripts/setup_remote.py configure --project YOUR_PROJECT --chat-questions
+python scripts/setup_remote.py prepare
+# PC状態ブリッジを新版で起動し直してから、Codex App内で別の処理として起動:
+python scripts/setup_remote.py questions
+```
+
+`questions`はCodex Appから提供されるローカル接続を使用します。通常の端末に接続情報を
+コピーする必要はありません。Codex Appへ「質問連携を起動して」と依頼できます。
+SPP／USBの中継、状態ブリッジ、HTTP配信とは独立した処理です。Hook定義や信頼記録は変更しません。
+
+```mermaid
+flowchart LR
+    Chat[選択したCodexチャット] -->|質問ID・質問・選択肢 / ローカル履歴| Questions[chat_questions.cjs]
+    Questions -->|認証付き HTTP /chat-questions| Status[PC状態ブリッジ]
+    Status <-->|認証付きWS| Relay[device_bridge.cjs]
+    Relay <-->|SPP / USB| Device[Plus2]
+    Questions -->|実機で選んだ回答 / Codex App Tools| Chat
+    Status -->|閲覧専用の配信| Simulator[Webシミュレータ]
+```
+
+- 選択済みの**ローカル1チャット**が対象です。別チャットや全セッションを自動操作しません。
+- 自由記述、選択肢なし、8択を超える質問、本文と選択肢の合計が2,000文字を超える質問はPCで回答します。
+  1回の質問要求は24問まで扱い、実機には一問ずつ表示します。
+- 新規質問から15分以内のカードを転送します。古いカードはPCに残り、履歴の再読込で復活させません。
+- PCでの回答が履歴に記録済みなら、時計側の質問を取り下げます。送信直前にも再確認します。
+- 連携処理から5秒間更新が途絶えると時計から回答できなくなります。送達が不明な回答は
+  PC内の配信記録に残し、再起動後も自動再送しません。PCで回答済みか確認してください。
+- `chat-answer-delivered`はCodex Appが返信を受け付けた状態です。
+  `chat-answer-unconfirmed`は送達が不明で、自動再送しない状態です。ログへ質問文・回答文・トークンは出しません。
+- シミュレータは閲覧専用です。実機の回答を試すときに、PC側の選択肢を押した結果を実機入力と取り違えません。
+- ツール実行の許可・拒否や、同期型`request_user_input`への回答はこの実装の対象外です。
+
+ローカル履歴とApp Toolsの接続形式はCodex Appの版に依存する互換アダプターです。
+Appを再起動したら質問連携も起動し直してください。形式変更や接続不能時はPCで回答し、
+画面の自動クリックや別の質問への代理入力へ切り替えません。
+
 ## 通信と再接続
 
 実機と同時にWebシミュレータへ本番データを表示する場合は、HTTP配信とは別のプロセスを起動します。

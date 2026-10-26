@@ -89,6 +89,7 @@ USB実機で表示・自動スクロール・A/B/C操作・回答の往復を確
 node --test tests/ui.test.mjs
 node --test tests/device_bridge.test.cjs
 node --test tests/simulator_feed.test.cjs
+node --test tests/chat_questions.test.cjs
 python -m unittest discover -s tests -p 'test_*.py' -v
 # Emscripten有効時の通信部品テスト（生成先は.cache内）
 em++ -std=c++17 -Ifirmware/stickc-plus2/include tests/device_link.cpp -sSINGLE_FILE=1 -sENVIRONMENT=node -sEXIT_RUNTIME=1 -o .cache/device-link-test.cjs

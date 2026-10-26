@@ -49,6 +49,18 @@ for private settings. Retain existing tokens and session selections. To migrate
 settings use `--import-config OLD_CONFIG`; it imports only PC facts and drops
 old hardware ports and interactive approval settings. Never print secrets.
 
+For explicit chat-choice integration, read section 4 of `docs/DEVICE_CONNECTION.md`.
+`configure --project PATH --chat-questions` enables ordinary asynchronous choice
+cards for the selected local Codex chat; it leaves operation approvals disabled.
+Start the rebuilt PC bridge, then run `questions` as a separate process from
+Codex App (its local App Tools connection is required). It reads only that chat's
+rollout and returns a real physical choice to the original native card and chat.
+It changes no hooks/trust records. Free text, synchronous request_user_input,
+tool approvals and other chats stay on the PC. On App restart, restart questions.
+Never synthesize human replies or replay an unconfirmed delivery; inspect the
+PC card instead. Questions older than 15 minutes are not forwarded. A mock test
+can validate the adapter but cannot prove an actual native card/device round trip.
+
 `hooks --project PATH` writes monitoring hooks. `--replace-product OLD_PRODUCT`
 explicitly replaces that Product's sender while preserving unrelated hooks.
 The user reviews changed definitions in Codex; do not edit trust records.

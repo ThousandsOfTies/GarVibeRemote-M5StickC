@@ -93,6 +93,11 @@ COM番号だけから機種や送信方向、BLE接続の可否を判定しま�
 
 ## 診断で止まった場合
 
+チャットの選択式質問も実機から回答する場合は、[質問連携](DEVICE_CONNECTION.md#4-このチャットの選択式質問を実機へ通知する)
+を追加します。`configure --project YOUR_PROJECT --chat-questions`で有効にし、新版のPC状態ブリッジと
+Codex App内の`questions`を動かします。監視用Hookのレビューをやり直す必要はありません。
+実行承認の設定`watchInput`は無効のままです。
+
 | 表示・状態 | 対応 |
 | --- | --- |
 | config: missing | `configure`でPC設定を作る |

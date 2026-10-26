@@ -42,7 +42,7 @@ def read_config(path: Path) -> dict:
         raise SetupError('セッションIDの形式が不正です。')
     return config
 
-def configure(path: Path, *, project: Path, session=None, label=None, port=None, import_config: Path | None=None) -> dict:
+def configure(path: Path, *, project: Path, session=None, label=None, port=None, import_config: Path | None=None, chat_questions=None) -> dict:
     path = private_path(path)
     if not project.is_dir():
         raise SetupError('監視するプロジェクトのフォルダーが存在しません。')
@@ -58,7 +58,9 @@ def configure(path: Path, *, project: Path, session=None, label=None, port=None,
               'port':port if port is not None else previous.get('port',39275),
               'sessionId':session if session is not None else previous.get('sessionId'),
               'label':label if label is not None else previous.get('label','M5StickC'),
-              'freshnessMs':previous.get('freshnessMs',90000), 'watchInput':False}
+              'freshnessMs':previous.get('freshnessMs',90000), 'watchInput':False,
+              'chatQuestions':chat_questions if chat_questions is not None else previous.get('chatQuestions',False)}
+    config['chatQuestionSources']=['m5stickc-plus2-spp','m5stickc-plus2-usb']
     for key in ('sppPort','sppBaudRate','firmware','firmwarePath','deviceTransport'):
         config.pop(key,None)
     config.setdefault('token',secrets.token_urlsafe(32))

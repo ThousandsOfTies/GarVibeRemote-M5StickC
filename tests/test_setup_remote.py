@@ -17,6 +17,17 @@ setup=importlib.util.module_from_spec(spec);spec.loader.exec_module(setup)
 settings=setup.settings
 
 class SetupTests(unittest.TestCase):
+    def test_chat_questions_are_opt_in_preserved_and_separate_from_execution_approvals(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);config=root/'private/local.json'
+            initial=settings.configure(config,project=root,session='chat-1')
+            self.assertFalse(initial['chatQuestions'])
+            enabled=settings.configure(config,project=root,chat_questions=True)
+            self.assertTrue(enabled['chatQuestions']);self.assertFalse(enabled['watchInput'])
+            self.assertEqual(enabled['chatQuestionSources'],['m5stickc-plus2-spp','m5stickc-plus2-usb'])
+            self.assertTrue(settings.configure(config,project=root)['chatQuestions'])
+            self.assertEqual(initial['token'],enabled['token'])
+
     def test_repeat_configuration_preserves_token_session_label_and_unrelated_settings(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);config=root/'private/local.json'
