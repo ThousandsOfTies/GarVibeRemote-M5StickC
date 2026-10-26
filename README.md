@@ -59,6 +59,8 @@ git submodule update --init --recursive
 ```
 
 submoduleはProductで固定したコミットを使い、導入のために`--remote`で更新しません。
+共有リポジトリのブランチ名に`simulator`が残っていても、実機かシミュレータかを選ぶ設定ではありません。
+実機のビルド対象は本Productの`firmware/stickc-plus2/platformio.ini`です。
 最初に次を読みます。スキルをまだインストールしていなくても、リポジトリ内のファイルを直接読めます。
 
 - [AGENTS.md](AGENTS.md)：このProductの作業範囲と共通ソースの扱い。
@@ -114,6 +116,7 @@ python scripts/firmware.py flash --port $UsbCom --model m5stickc-plus2
 最初の書き込み前に8MBのバックアップとSHA256の記録を確認します。`flash`は自動バックアップを行いません。
 バックアップや接続設定はこの利用者のPC内に保存し、他人のファイルを流用・公開しません。
 書き込むのは`firmware/stickc-plus2`であり、共有App内の旧`m5stickc-client`ではありません。
+旧クライアントのA／B／Pの操作表やWi-Fi設定を流用せず、本ProductのC選択／A決定／B一覧を使います。
 
 ### 4. ペアリングと実機の通信試験を行う
 

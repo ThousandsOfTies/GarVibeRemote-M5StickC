@@ -5,13 +5,25 @@ USBシリアルも同じファームウェア・メッセージ形式で使用�
 
 ```mermaid
 flowchart LR
-    Hook[Codex Hook] -->|HTTP /events| Status[PC状態ブリッジ]
+    App[Codex Appのローカルチャット] -->|App Tools / 状態| Monitor[session_monitor.cjs]
+    App -->|ローカル履歴 / 質問| Log[native_question_log.cjs]
+    Monitor -->|HTTP /sessions| Status[PC状態ブリッジ / 39275]
+    Monitor -.->|チャットごとに管理| Questions[question_service.cjs]
+    Log --> Questions
+    Questions <-->|認証付きHTTP /chat-questions| Status
+    Questions -->|実機回答 / Codex App Tools| App
+    Hook[任意の監視用Codex Hook] -->|HTTP /events| Status
     Status <-->|認証付きWebSocket| Device[device_bridge.cjs]
-    Device <-->|Bluetooth SPP または USB / JSON Lines| Plus2[Plus2 / CompactUi / LVGL]
+    Device <-->|SPP または USB / JSON Lines| Plus2[Plus2 / CompactUi / LVGL]
+    Status -->|認証付きWebSocket| Feed[simulator_feed.cjs / 8775]
+    Feed -->|閲覧専用WebSocket| Web[Webシミュレータ / 同じCompactUiのWASM]
+    HTTP[静的HTTP配信 / 8772] -->|HTML・部品・WASM| Web
 ```
 
 状態ブリッジは従来どおりPCのlocalhostで動きます。デバイス中継はCOMポートへの接続と形式変換だけを担当し、
 HTTPサーバ・シミュレータ・Hook変更・ペアリングを行いません。PC用の接続トークンはPC内で使い、実機へ送信・保存しません。
+`chat_questions.cjs`は質問処理の起動入口で、単一監視なら1つの`question_service.cjs`、
+複数監視なら`session_monitor.cjs`を起動します。シミュレータを経由せずに実機へ接続します。
 
 ## 1. ファームウェアとペアリング
 
@@ -93,12 +105,14 @@ SPP／USBの中継、状態ブリッジ、HTTP配信とは独立した処理で�
 
 ```mermaid
 flowchart LR
-    Chat[選択したCodexチャット] -->|質問ID・質問・選択肢 / ローカル履歴| Questions[chat_questions.cjs]
+    Chat[選択したCodexチャット] -->|ローカル履歴| Log[native_question_log.cjs]
+    Log -->|質問ID・質問・選択肢| Questions[question_service.cjs]
     Questions -->|認証付き HTTP /chat-questions| Status[PC状態ブリッジ]
     Status <-->|認証付きWS| Relay[device_bridge.cjs]
     Relay <-->|SPP / USB| Device[Plus2]
     Questions -->|実機で選んだ回答 / Codex App Tools| Chat
-    Status -->|閲覧専用の配信| Simulator[Webシミュレータ]
+    Status -->|認証付きWS| Feed[simulator_feed.cjs]
+    Feed -->|閲覧専用WS| Simulator[Webシミュレータ]
 ```
 
 - 上記コマンドは単一監視の例です。複数監視では、次節の範囲内にある各ローカルチャットの質問を独立して扱います。

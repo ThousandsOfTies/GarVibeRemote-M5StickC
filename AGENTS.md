@@ -20,8 +20,10 @@ Keep HTTP serving separate from build, device transports and AI-client setup.
 
 PC setup lives in scripts/setup_remote.py and scripts/remote_config.py; see
 docs/INSTALL.md, docs/DEVICE_CONNECTION.md and skills/stickc-setup/SKILL.md. Firmware lives in
-firmware/stickc-plus2 and reuses CompactUi unchanged. scripts/firmware.py builds,
-backs up and flashes the confirmed Plus2; scripts/serial_demo.py tests physical
+firmware/stickc-plus2 and reuses CompactUi unchanged. The shared m5stickc-client
+is the separate legacy Wi-Fi implementation; its handoff/button mapping and
+T-Watch touch instructions do not apply to this Product. scripts/firmware.py
+builds, backs up and flashes the confirmed Plus2; scripts/serial_demo.py tests physical
 input over USB. scripts/device_bridge.cjs connects the existing selected-session
 Codex bridge over SPP or USB; device_trial.cjs is an isolated physical test.
 scripts/session_monitor.cjs collects up to 16 local Codex chats across projects,

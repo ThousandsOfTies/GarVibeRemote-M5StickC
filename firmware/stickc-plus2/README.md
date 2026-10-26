@@ -12,6 +12,20 @@ LCDは135×240、Aで決定、Bで一覧／戻る、C短押しで循環選択。
 対象は**M5StickC Plus2のみ**です。USBシリアル機器の型番では本体を識別できません。
 初代StickC／Plus／T-Watch用に、この環境を書き込まないでください。
 
+## 現行のコード構成
+
+| ファイル | 責務 |
+| --- | --- |
+| `src/main.cpp` | M5Unified・LVGL・USB／SPPの接続、ペアリングの通知とメインループ |
+| `include/DeviceLink.h` | JSON Linesの組み立て、USB／SPPの操作権、8秒の接続期限。ハードウェアAPIは持たない |
+| `include/PairingConsent.h` | 番号照合の確認・拒否・認証・30秒の期限。Bluetooth APIは持たない |
+| Productの`sources/gar-vibe-ui/vibe-remote/compact-ui/` | 画面描画・スクロール・セッション切替・A／B／C操作。実機とWASMで共通 |
+| `scripts/shared_ui.py` | ビルド時に共有UI・フォント・LVGL設定を参照するためのパス設定 |
+
+この実機の描画・操作は共有UIへ、通信のフレーム処理と確認状態は独立した部品へ分けています。
+共有Appの`m5stickc-client/src/main.cpp`は旧Wi-Fi版で、このビルドからは参照しません。
+実機を更新せずに部品を検証する場合は、Productの`tests/device_link.cpp`と`tests/ui.test.mjs`を使います。
+
 ## 書き込み
 
 Productルートで実行します。Pythonとインターネット接続が必要です。
