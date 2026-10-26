@@ -52,6 +52,9 @@ tool approvals, replay uncertain deliveries or automate the Codex desktop UI.
 Keep roster order/membership stable at capacity; a background update must not
 reset another session's reading position or focused option. Use a stable display
 budget per card and preserve the device's 16-session / 64 KiB JSONL limits.
+CompactUi owns priority-based automatic selection (waiting > failed > running >
+idle/done), including button/list/answer guards and short feedback holds. Keep
+selection display-only; never generate an answer while automatically switching.
 Its rollout/App Tools compatibility is version-specific; free text and synchronous
 request_user_input stay on the PC. It changes no hook definitions or trust records.
 PC loopback test replies are synthetic and never user approval.

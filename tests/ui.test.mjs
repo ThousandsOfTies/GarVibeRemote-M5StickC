@@ -20,6 +20,7 @@ const longText='日本語の長い質問を表示します。本文を読みな�
 const question=(sessionId='s1',id='q1',message=longText)=>({type:'state',session:{id:sessionId,name:`画面テスト${sessionId}`},ui:{id,state:'waiting',message,actions:[{id:'yes',label:'YES',button:'A'},{id:'no',label:'NO',button:'B'}]}});
 const list=(...sessions)=>({type:'sessions',sessions});
 const ack=(sessionId='s1',uiId='q1',actionId='no',ok=true)=>({type:'ack',sessionId,uiId,actionId,ok});
+const status=(id,state)=>({type:'state',session:{id,name:id},agent:{status:state,message:`状態：${state}`}});
 
 test('portrait LVGL framebuffer renders full UTF-8 text with only line breaks inserted',async()=>{
   const a=await app();assert.equal(a.m._gar_lv_width(),135);assert.equal(a.m._gar_lv_height(),240);
@@ -140,7 +141,7 @@ test('scroll pauses in list and resumes at each session own reading position',as
   a.tick(7800);a.press('B');const second=a.state().scrollPixels;a.press('C');a.press('A');assert.equal(a.state().scrollPixels,first);
   a.select(1);assert.equal(a.state().scrollPixels,second);
 });
-test('background updates never steal the selected session or reset its reading/choice',async()=>{
+test('background updates preserve a focused answer and its reading/choice',async()=>{
   const a=await app();a.receive(list(question('s1'),question('s2')));a.tick(5800);a.press('C');const before=a.state();
   a.receive(question('s2','replacement'));assert.equal(a.state().sessionId,'s1');assert.equal(a.state().scrollPixels,before.scrollPixels);assert.equal(a.state().choice,0);
   a.edge('A',1);a.receive(question('s3'));a.edge('A',0);assert.equal(a.action().sessionId,'s1');
@@ -210,4 +211,133 @@ test('long power gesture C is not a focus step; separate instances stay independ
   const a=await app(),b=await app();a.receive(question('a'));b.receive(question('b'));
   a.press('C',2000);assert.equal(a.state().choice,1);a.press('C');a.press('A');assert.equal(a.action().sessionId,'a');
   assert.equal(b.state().choice,1);assert.equal(b.action(),null);
+});
+
+test('automatic selection follows waiting > failed > running > idle, including idle-to-running',async()=>{
+  for(const format of ['state','sessions']){
+    const a=await app();const entries=[status('idle','idle'),status('work','idle'),status('error','idle'),status('ask','idle')];
+    const update=(index,value)=>{entries[index]=value;a.receive(format==='state'?value:list(...entries));};
+    a.receive(list(...entries));assert.equal(a.state().sessionId,'idle');
+    update(1,status('work','running'));assert.equal(a.state().sessionId,'work',format);
+    update(2,status('error','failed'));assert.equal(a.state().sessionId,'error');
+    update(3,question('ask'));assert.equal(a.state().sessionId,'ask');
+    update(1,status('work','running'));assert.equal(a.state().sessionId,'ask');
+    assert.equal(a.state().selectedPriority,4);assert.equal(a.action(),null);
+  }
+});
+
+test('same-priority events and roster reordering do not bounce the selected session',async()=>{
+  const a=await app();a.receive(list(status('idle','idle'),status('b','running'),status('c','running')));
+  assert.equal(a.state().sessionId,'b');a.receive(status('c','running'));assert.equal(a.state().sessionId,'b');
+  a.receive(list(status('c','running'),status('idle','idle'),status('b','running')));
+  assert.equal(a.state().sessionId,'b');a.receive(question('c'));assert.equal(a.state().sessionId,'c');
+  a.receive(question('b'));assert.equal(a.state().sessionId,'c');
+});
+
+test('automatic selection preserves the previous session reading position',async()=>{
+  const a=await app(),working=status('work','running');working.agent.message=longText;
+  a.receive(list(working,status('ask','idle')));a.tick(5800);const position=a.state().scrollPixels;
+  assert.ok(position>0);a.receive(question('ask'));a.tick(7000);a.select(0);
+  assert.equal(a.state().sessionId,'work');assert.equal(a.state().scrollPixels,position);
+});
+
+test('a held A on an idle session cannot answer a question that arrives before release',async()=>{
+  const a=await app();a.receive(status('idle','idle'));a.edge('A',1);a.receive(question('new'));
+  assert.equal(a.state().sessionId,'idle');assert.equal(a.state().autoPaused,'button');
+  a.edge('A',0);assert.equal(a.state().sessionId,'new');assert.equal(a.action(),null);
+  a.edge('A',0);assert.equal(a.action(),null); // Releasing an old key is never a new confirmation.
+  a.press('A');assert.equal(a.action().sessionId,'new');
+});
+
+test('list navigation freezes automatic selection; closing the list resumes it',async()=>{
+  const a=await app();a.receive(list(status('idle','idle'),status('work','idle')));a.edge('B',1);
+  a.receive(status('work','running'));a.edge('B',0);assert.equal(a.state().listOpen,true);
+  a.receive(question('ask'));a.tick(20000);assert.equal(a.state().sessionId,'idle');
+  assert.equal(a.state().autoPaused,'list');a.press('C');assert.equal(a.state().listFocus,1);
+  a.press('B');assert.equal(a.state().sessionId,'ask');assert.equal(a.action(),null);
+});
+
+test('a manually opened status stays readable for ten seconds before automatic selection resumes',async()=>{
+  const a=await app();a.receive(list(status('idle','idle'),question('ask')));assert.equal(a.state().sessionId,'ask');
+  a.select(0);assert.equal(a.state().sessionId,'idle');assert.equal(a.state().autoPaused,'manual');
+  a.tick(9999);assert.equal(a.state().sessionId,'idle');a.tick(1);assert.equal(a.state().sessionId,'ask');
+  assert.equal(a.action(),null);
+});
+
+test('choosing a reply pins its identity until answered or resolved, across live updates',async()=>{
+  const a=await app();a.receive(list(question('first'),question('second')));a.press('C');
+  const before=a.state();a.receive(question('second','replacement'));a.receive(status('error','failed'));a.tick(15000);
+  assert.equal(a.state().sessionId,'first');assert.equal(a.state().choice,before.choice);
+  assert.equal(a.state().autoPaused,'choice');assert.equal(a.state().waitingCount,2);
+  a.receive(status('first','idle'));assert.equal(a.state().sessionId,'second');assert.equal(a.action(),null);
+});
+
+test('successful replies show feedback for two seconds then select the oldest remaining question',async()=>{
+  const a=await app();a.receive(list(question('first'),status('second','idle'),status('third','idle')));
+  a.receive(question('second'));a.receive(question('third'));a.press('A');const sent=a.action();
+  assert.equal(sent.sessionId,'first');a.tick(3000);assert.equal(a.state().sessionId,'first');
+  a.receive(ack('first'));assert.equal(a.state().autoPaused,'received');
+  // A fresh question in the answered chat must not jump ahead of queued questions.
+  a.receive(list(question('third'),question('first','next-question'),question('second')));
+  a.tick(1999);assert.equal(a.state().sessionId,'first');a.tick(1);
+  assert.equal(a.state().sessionId,'second');assert.equal(a.action(),null);
+  a.press('A');assert.equal(a.action().sessionId,'second');a.receive(ack('second'));a.tick(2000);
+  assert.equal(a.state().sessionId,'third');
+});
+
+test('reply feedback ignores an extra A press even when the same session already has a new question',async()=>{
+  const a=await app();a.receive(question('same'));a.press('A');a.action();a.receive(ack('same'));
+  a.receive(question('same','new-question'));assert.equal(a.state().answerable,false);
+  a.press('A');assert.equal(a.action(),null);assert.equal(a.state().autoPaused,'received');
+  a.tick(2000);assert.equal(a.state().answerable,true);a.press('A');assert.equal(a.action().uiId,'new-question');
+});
+
+test('PC forwarding states with no actions preserve receipt identity without blocking the next question',async()=>{
+  for(const ackFirst of [true,false]){
+    const a=await app();a.receive(list(question('first'),question('second')));a.press('A');a.action();
+    if(ackFirst)assert.equal(a.receive(ack('first')),1);
+    const forwarding=question('first');forwarding.ui.message='回答をPCへ送信中';forwarding.ui.actions=[];
+    a.receive(forwarding);assert.equal(a.state().pending,'no');assert.equal(a.state().actions.length,0);
+    if(!ackFirst)assert.equal(a.receive(ack('first')),1);
+    a.tick(2000);assert.equal(a.state().sessionId,'second');assert.equal(a.action(),null);
+  }
+  const a=await app();a.receive(list(status('idle','idle'),question('ask')));a.press('A');a.action();
+  a.receive(ack('ask'));a.tick(2000);assert.equal(a.state().sessionId,'ask'); // No bounce between idle peers.
+});
+
+test('failed delivery keeps the current question and its focus for explicit retry',async()=>{
+  const a=await app();a.receive(list(question('first'),question('second')));a.press('C');a.press('A');a.action();
+  a.receive(ack('first','q1','yes',false));a.tick(12000);
+  assert.equal(a.state().sessionId,'first');assert.equal(a.state().autoPaused,'choice');assert.ok(a.state().error);
+  assert.equal(a.action(),null);a.press('A');assert.equal(a.action().actionId,'yes');
+});
+
+test('completion is brief, then running wins; an urgent question interrupts the completion notice',async()=>{
+  for(const finished of ['done','idle']){
+    const a=await app();a.receive(list(status('a','running'),status('b','running')));
+    a.receive(status('a',finished));assert.equal(a.state().sessionId,'a');assert.equal(a.state().autoPaused,'completed');
+    a.tick(1999);assert.equal(a.state().sessionId,'a');a.tick(1);assert.equal(a.state().sessionId,'b');
+    assert.equal(a.state().autoPaused,'');
+  }
+  const a=await app();a.receive(list(status('a','running'),status('b','running')));
+  a.receive(status('a','done'));a.receive(question('urgent'));assert.equal(a.state().sessionId,'urgent');
+  assert.equal(a.state().autoPaused,'');
+  a.receive(status('urgent','running'));a.receive(status('urgent','idle'));
+  assert.equal(a.state().autoPaused,'completed');a.receive(status('urgent','running'));
+  assert.equal(a.state().autoPaused,''); // A new run must not keep showing the old completion.
+});
+
+test('removing a held question never transfers its A confirmation to the automatically selected replacement',async()=>{
+  const a=await app();a.receive(list(question('old'),status('idle','idle'),question('next')));a.press('C');
+  a.edge('A',1);a.receive(list(status('idle','idle'),question('next')));a.edge('A',0);
+  assert.equal(a.state().sessionId,'next');assert.equal(a.action(),null);
+  a.press('A');assert.equal(a.action().sessionId,'next');
+});
+
+test('disconnection and power-off suspend automatic selection until a valid connection returns',async()=>{
+  const a=await app();a.receive(status('idle','idle'));a.hardware(true,false);a.receive(question('ask'));
+  assert.equal(a.state().sessionId,'idle');assert.equal(a.state().autoPaused,'connection');
+  a.hardware(true,true);assert.equal(a.state().sessionId,'ask');a.hardware(false,true);
+  a.receive(status('ask','idle'));a.receive(status('work','running'));assert.notEqual(a.state().sessionId,'work');
+  a.hardware(true,true);assert.equal(a.state().sessionId,'work');assert.equal(a.action(),null);
 });

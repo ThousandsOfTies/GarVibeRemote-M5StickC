@@ -27,7 +27,7 @@ try {
     scenario('multi');await press('B');check(state().listOpen,'session list');await press('C');check(state().listFocus===1,'next focus');
     await press('A');check(state().sessionId==='notes'&&!state().listOpen,'switch');check(state().pending==='','no phantom response');
   });
-  await run('background questions do not steal current session; all choice labels can be selected',async()=>{
+  await run('manual navigation keeps the selected session; all choice labels can be selected',async()=>{
     const selected=state().sessionId;action('background');check(state().sessionId===selected,'selection preserved');
     scenario('choices');check(state().actions.length===3,'three options');await press('C');await press('C');check(state().choice===2,'third option');
     await press('A');await pause(600);check(state().pending==='stop'&&state().acknowledged,'third option response');
@@ -45,6 +45,22 @@ try {
   await run('power controls preserve passive LCD input',async()=>{
     scenario('short');condition('powered',false);check(!state().powered&&!device.powered,'off');condition('powered',true);
     doc.querySelector('#screen').dispatchEvent(new MouseEvent('click',{bubbles:true,composed:true}));check(!state().pending,'LCD click does nothing');scenario('multi');
+  });
+  await run('consumed C power gestures release button state before automatic selection resumes',async()=>{
+    scenario('idle');await press('C',6100);check(!state().powered,'C turns off');
+    await press('C',2100);check(state().powered,'C turns on');action('start-background');
+    check(state().state==='running'&&state().autoPaused==='','power key is not stuck');
+  });
+  await run('idle yields to running, list navigation pauses selection, and answering advances to a queued question',async()=>{
+    scenario('idle');action('start-background');check(state().state==='running','running beats idle');
+    const selected=state().sessionId;await press('B');action('background');
+    check(state().listOpen&&state().sessionId===selected,'list stays fixed');
+    await press('B');check(state().state==='waiting'&&state().sessionId!==selected,'question beats running');
+    const questionSession=state().sessionId;await press('C');action('background');
+    check(state().sessionId===questionSession&&state().autoPaused==='choice','choice stays fixed');
+    await press('A');await pause(700);check(state().sessionId===questionSession&&state().acknowledged,'reply feedback');
+    await pause(2100);check(state().sessionId!==questionSession&&state().answerable,'next unanswered question');
+    scenario('multi');
   });
 } catch(e) {failed++;lines.push('FAIL startup: '+e.message);out.textContent=lines.join('\n');}
 out.dataset.failed=String(failed);out.dataset.complete='true';

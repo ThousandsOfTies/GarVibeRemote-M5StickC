@@ -27,6 +27,7 @@ controls.schema = [
     {value:'running',label:'実行中'}, {value:'idle',label:'待機中'},
     {value:'done',label:'完了'}, {value:'failed',label:'エラー'}]},
   { id:'resend', type:'action', label:'試験データを入れ直す' },
+  { id:'start-background', type:'action', label:'別セッションで実行開始' },
   { id:'background', type:'action', label:'別セッションに質問を追加' },
   { id:'connected', type:'checkbox', label:'模擬PCとの接続', value:true },
   { id:'powered', type:'checkbox', label:'本体の電源', value:true },
@@ -95,6 +96,8 @@ function state(id, name, status, message, actions = []) {
 function scenario(name) {
   for (const receipt of receipts.values()) clearTimeout(receipt.timer);
   receipts.clear(); states.clear();
+  // An explicit scenario restart also ends any manual reading / receipt hold.
+  ui.receive({type:'sessions',sessions:[]});
   let examples;
   if (name === 'multi') examples = [
     state('screen','画面の改善','waiting',longQuestion,yesNo),
@@ -116,12 +119,14 @@ function scenario(name) {
   receive({type:'sessions',sessions:examples});
   answer.textContent = 'まだ回答していません';
 }
-function backgroundQuestion() {
+function backgroundUpdate(status='waiting') {
   const selected = ui.snapshot.sessionId;
   const target = [...states.keys()].find(id => id !== selected) || 'background';
   const previous = states.get(target);
-  const example = state(target,previous?.session.name || '別の作業','waiting',
-    '別のセッションから確認が届きました。この後の進め方を選んでください。',choices);
+  const example = state(target,previous?.session.name || '別の作業',status,
+    status==='running'?'別のセッションで作業を開始しました。':
+      '別のセッションから確認が届きました。この後の進め方を選んでください。',
+    status==='running'?[]:choices);
   states.set(target,example); receive(example);
 }
 async function start() {
@@ -156,10 +161,12 @@ async function start() {
   device.addEventListener('gar-button',({detail}) => {
     const {button,phase,durationMs} = detail;ui.advanceClock();
     if(liveMode && button==='A' && !ui.snapshot.listOpen) {
+      if(phase!=='down') { module._gar_app_button(button.charCodeAt(0),-1);ui.update(); }
       if(phase==='up')answer.textContent='この画面は閲覧用です。回答は実機から行ってください。';
       return;
     }
     if (button === 'C' && phase === 'up' && durationMs >= (device.powered ? 6000 : 2000)) {
+      module._gar_app_button(button.charCodeAt(0),-1);
       controls.values = {powered:!device.powered};hardware();
     } else {
       module._gar_app_button(button.charCodeAt(0),phase === 'down' ? 1 : phase === 'up' ? 0 : -1);ui.update();
@@ -168,7 +175,8 @@ async function start() {
   });
   controls.addEventListener('gar-control',({detail}) => {
     if (detail.id === 'scenario' || detail.id === 'resend') scenario(controls.values.scenario);
-    if (detail.id === 'background') backgroundQuestion();
+    if (detail.id === 'background') backgroundUpdate();
+    if (detail.id === 'start-background') backgroundUpdate('running');
     if (detail.id === 'connected' || detail.id === 'powered') hardware();
   });
   hardware();if(liveMode)startLive();else scenario('multi');
