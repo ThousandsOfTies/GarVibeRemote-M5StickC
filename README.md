@@ -181,7 +181,7 @@ AIは起動したプロセスとログの保存先を把握し、他の用途の
 - 実機中継の`device-ready`を確認でき、ユーザーが実機の表示とA／B／Cの操作を確認した。
 - 対象Codexで実際に作業し、実行中・待機中などの状態変化が実機へ届く。
 - **対象チャットで新しい選択式の確認質問を出し**、ユーザーが実機のC→Aで回答する。PC側のカードは押さない。
-- `chat-answer-delivered`の`source: m5stickc-plus2-spp`（USBでは`m5stickc-plus2-usb`）と、**回答が同じチャットへ届き、AIがその回答を使ったこと**を確認する。PCの質問カードが閉じたこととは区別する。
+- `chat-answer-delivered`の`source: m5stickc-plus2-spp`（USBでは`m5stickc-plus2-usb`）と、**回答が同じチャットへ届き、AIがその回答を使ったこと**を確認する。PC側の質問カードも回答済みになって閉じることを確認する。
 - 複数チャットを使う場合は、別々の実チャット2つの質問が一覧に入り、B→C→Aで切り替えて回答した結果が、それぞれの元の質問へ1回ずつ戻る。
 
 PC内の試験、実機専用の試験用質問、チャットの本物の質問は分けて報告します。
@@ -227,10 +227,12 @@ ChatGPTの通常チャット、クラウド・別PCのCodexは含めません。
 一覧の外にある新規対象はピン留めまたは`manual`で指定してください。16件を超えると既存枠を保持し、空いた枠へ追加します。
 詳しい範囲指定と制限は[複数セッションの手順](docs/DEVICE_CONNECTION.md#5-複数のcodexチャットを監視する)を参照してください。
 チャット質問連携はCodex Appの`request_user_input_async`が対象で、自由記述・同期型`request_user_input`・ツール実行承認はPCで扱います。
-ローカル履歴とApp Toolsの形式に依存し、2026-10-26時点ではCodex App 26.1021.3705.0で実機往復を確認しています。
-現行の返信は`send_message_to_thread`によるメッセージ送信です。元の質問IDは保持しますが、
-PCの選択肢カードを回答済みにして閉じる処理は連動していません。
-時計から回答してもPCにカードが残る場合があります。これは実機側の回答後表示とは別の制限です。
+ローカル履歴、App Tools、ローカルのチャット連携IPCの形式に依存し、2026-10-26時点では
+Codex App 26.1021.3705.0で実機往復と、元の質問が回答済みになることを確認しています。
+状態の収集はApp Tools、回答は`native_chat_reply.cjs`が通常のユーザー回答として渡す経路を使います。
+実行中は既存ターンへの返信、終了後は同じチャットの次のターンとして送り、PCの質問カードも完了します。
+このIPCは版に依存する内部接続です。互換性を確認できない場合は送信せず、PCで回答してください。
+以前の`send_message_to_thread`経由への自動切り替えや、送達不明な回答の再送は行いません。
 異なる版で動かない場合は互換性の未確認として切り分け、成功したことにしないでください。
 BLE、Copilot／Claudeなど他クライアント専用の連携、長時間利用時の電池寿命の検証は含まれていません。
 
@@ -319,7 +321,8 @@ PCブリッジは設定した監視範囲から最大16セッションを配信�
 | `session_monitor.cjs` | チャット一覧と状態の収集・各チャットの質問処理の管理 |
 | `native_question_log.cjs` | ローカル履歴の読み取り・質問と回答済みの判定。通信は行わない |
 | `question_service.cjs` | 1チャット分の質問配信・実機回答の受信・送信記録 |
-| `codex_app_client.cjs` | Codex Appへの接続と、元のチャット・質問への回答 |
+| `codex_app_client.cjs` | Codex Appの状態取得・返信可能なチャットの確認 |
+| `native_chat_reply.cjs` | 元の質問を照合し、実機の選択を通常のユーザー回答として届ける版依存のIPC接続 |
 | `device_protocol.cjs` | JSON Linesの読み取りと表示形式への変換。実機とWeb配信で共有 |
 | `device_bridge.cjs` | USB／SPPとPCブリッジの中継 |
 | `simulator_feed.cjs` | ブラウザへの閲覧専用配信。実機の中継には依存しない |
@@ -337,6 +340,7 @@ node --test tests/simulator_feed.test.cjs
 node --test tests/chat_questions.test.cjs
 node --test tests/multi_session.test.cjs
 node --test tests/pc_runtime.test.cjs
+node --test tests/native_chat_reply.test.cjs
 python -m unittest discover -s tests -p 'test_*.py' -v
 # Emscripten有効時の通信部品テスト（生成先は.cache内）
 em++ -std=c++17 -Ifirmware/stickc-plus2/include tests/device_link.cpp -sSINGLE_FILE=1 -sENVIRONMENT=node -sEXIT_RUNTIME=1 -o .cache/device-link-test.cjs

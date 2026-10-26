@@ -338,6 +338,8 @@ test('App disconnection disables dispatch, expires questions and recovers with f
 
 test('App pipe keeps the anchor caller and exact target chat and rejects replies after removal', async t => {
   const calls = [], sockets = new Set();
+  const replies=[];
+  const nativeReplies={async reply(question,choiceId,sessionId,beforeSend){beforeSend();replies.push({question,choiceId,sessionId})},close(){}};
   const server = net.createServer(socket => {
     sockets.add(socket); socket.on('close', () => sockets.delete(socket)); let data = Buffer.alloc(0);
     socket.on('data', chunk => {
@@ -345,7 +347,7 @@ test('App pipe keeps the anchor caller and exact target chat and rejects replies
       while (data.length >= 4 && data.length >= data.readUInt32LE() + 4) {
         const size = data.readUInt32LE(), message = JSON.parse(data.subarray(4, size + 4)); data = data.subarray(size + 4);
         let result;
-        if (message.method === 'tools/list') result = { tools: [{ name: 'send_message_to_thread', namespace: 'codex_app' }] };
+        if (message.method === 'tools/list') result = { tools: ['list_threads','read_thread'].map(name=>({name,namespace:'codex_app'})) };
         else {
           calls.push(message);
           const content = message.params.tool === 'list_threads' ? { pinnedThreads: [row()], threads: [row(other, projectB)] } :
@@ -359,23 +361,22 @@ test('App pipe keeps the anchor caller and exact target chat and rejects replies
     });
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const client = new CodexAppClient({ pipePath: { host: '127.0.0.1', port: server.address().port }, sessionId: anchor });
+  const client = new CodexAppClient({ pipePath: { host: '127.0.0.1', port: server.address().port }, sessionId: anchor, nativeReplies });
   t.after(async () => { client.close(); for (const socket of sockets) socket.destroy(); await new Promise(resolve => server.close(resolve)); });
   await client.ready();
   assert.deepEqual((await client.listThreads()).map(s => s.id), [anchor, other]);
   assert.equal((await client.readThread(other)).id, other);
   client.allowReplies([anchor, other]);
   await client.reply({ id: questionId, originalQuestion: 'Synthetic fixture question', originalOptions: ['First', 'Second'] }, 'option-1', other);
-  const sent = calls.find(m => m.params.tool === 'send_message_to_thread');
-  assert.equal(sent.params.threadId, anchor); assert.equal(sent.params.arguments.threadId, other);
-  assert.equal(sent.params.arguments.hostId, 'local');
-  assert.deepEqual(JSON.parse(sent.params.arguments.prompt.split('\n')[1]), [
-    { questionItemId: questionId, question: 'Synthetic fixture question', answer: 'Second' }
-  ]);
+  assert.ok(calls.every(m=>m.params.threadId===anchor));
+  assert.equal(calls.some(m=>m.params.tool==='send_message_to_thread'),false);
+  assert.equal(replies[0].sessionId,other); assert.equal(replies[0].question.id,questionId);
+  assert.equal(replies[0].choiceId,'option-1');
   client.allowReplies([anchor]);
   const count = calls.length;
   await assert.rejects(client.reply({ id: questionId, originalQuestion: 'Synthetic fixture question', originalOptions: ['First', 'Second'] }, 'option-0', other));
   assert.equal(calls.length, count);
+  assert.equal(replies.length,1);
 });
 
 test('multi-session browser feed exposes both identities but remains read-only and clears on bridge loss', async t => {

@@ -33,9 +33,10 @@ class NativeQuestionLog {
       } else if (
         p.type === 'item_completed' &&
         p.thread_id === this.sessionId &&
-        ['UserMessage', 'userMessage'].includes(p.item?.type)
+        (['UserMessage', 'userMessage'].includes(p.item?.type) ||
+          (p.item?.type === 'steeringUserMessage' && p.item.status === 'accepted'))
       ) {
-        this.recordReply(p.item.content);
+        this.recordReply(p.item.type === 'steeringUserMessage' ? p.item.input : p.item.content);
       }
       return;
     }

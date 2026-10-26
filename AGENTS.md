@@ -42,7 +42,11 @@ browser input must not become a real approval. Static serving stays separate.
 scripts/chat_questions.cjs dispatches the single-chat or multi-session CLI.
 native_question_log.cjs parses local history without network access;
 question_service.cjs mirrors cards and delivers physical selections through
-codex_app_client.cjs. Services must not import their CLI dispatcher or start
+codex_app_client.cjs and the version-specific native_chat_reply.cjs coordination IPC.
+App Tools is read-only; ordinary replies use steer/start with their original card
+identities, after checking the native owner and current card. Never fall back to
+delegated messages, tool output or UI automation for card completion.
+Services must not import their CLI dispatcher or start
 processes on import. See docs/DEVICE_CONNECTION.md. Do not synthesize human answers, forward
 tool approvals, replay uncertain deliveries or automate the Codex desktop UI.
 Keep roster order/membership stable at capacity; a background update must not

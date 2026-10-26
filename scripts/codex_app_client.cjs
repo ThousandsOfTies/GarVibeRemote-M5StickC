@@ -2,18 +2,21 @@
 const net = require('node:net');
 const { randomUUID } = require('node:crypto');
 const { isSessionId } = require('./pc_config.cjs');
+const { NativeChatReply } = require('./native_chat_reply.cjs');
 const MAX_FRAME = 8 * 1024 * 1024;
 
 class CodexAppClient {
   constructor({
     pipePath = process.env.CODEX_APP_TOOLS_PIPE_PATH,
     sessionId,
-    timeoutMs = 8000
+    timeoutMs = 8000,
+    nativeReplies = new NativeChatReply({ timeoutMs })
   } = {}) {
     if (!pipePath || !isSessionId(sessionId)) throw Error('Codex App connection is unavailable');
     this.pipePath = pipePath;
     this.sessionId = sessionId;
     this.timeoutMs = timeoutMs;
+    this.nativeReplies = nativeReplies;
     this.allowedSessionIds = new Set([sessionId]);
     this.nextId = 0;
     this.pending = new Map();
@@ -106,10 +109,12 @@ class CodexAppClient {
   }
   async ready() {
     const result = await this.request('tools/list', { threadStartKind: 'all' });
-    const tool = result?.tools?.find(
-      (t) => t.name === 'send_message_to_thread' && t.namespace === 'codex_app'
-    );
-    if (!tool) throw Error('This Codex App does not expose chat replies');
+    if (
+      !['list_threads', 'read_thread'].every((name) =>
+        result?.tools?.some((t) => t.name === name && t.namespace === 'codex_app')
+      )
+    )
+      throw Error('This Codex App does not expose chat monitoring');
   }
   allowReplies(ids) {
     if (!Array.isArray(ids) || ids.length > 16 || !ids.every(isSessionId))
@@ -117,8 +122,7 @@ class CodexAppClient {
     this.allowedSessionIds = new Set(ids);
   }
   async call(tool, args, beforeSend) {
-    if (!['list_threads', 'read_thread', 'send_message_to_thread'].includes(tool))
-      throw Error('Unsupported App operation');
+    if (!['list_threads', 'read_thread'].includes(tool)) throw Error('Unsupported App operation');
     const result = await this.request(
       'tools/call',
       {
@@ -164,30 +168,12 @@ class CodexAppClient {
         throw Error('The question chat is no longer monitored');
     };
     requireEnrolled();
-    if (typeof choiceId !== 'string' || !/^option-\d+$/.test(choiceId))
-      throw Error('Invalid native chat reply');
-    const option = question.originalOptions[Number(choiceId.replace(/^option-/, ''))];
-    if (typeof option !== 'string' || !question.id || !question.originalQuestion)
-      throw Error('Invalid native chat reply');
-    const prompt =
-      '<send_user_message_question_reply>\n' +
-      JSON.stringify([
-        {
-          questionItemId: question.id,
-          question: question.originalQuestion,
-          answer: option
-        }
-      ]) +
-      '\n</send_user_message_question_reply>';
-    return this.call(
-      'send_message_to_thread',
-      { threadId: sessionId, hostId: 'local', prompt },
-      requireEnrolled
-    );
+    return this.nativeReplies.reply(question, choiceId, sessionId, requireEnrolled);
   }
   close() {
     this.connectingSocket?.destroy(Error('Codex App connection closed'));
     this.socket?.destroy();
+    this.nativeReplies.close();
   }
 }
 module.exports = { CodexAppClient };

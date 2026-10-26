@@ -118,7 +118,11 @@ test('chat question HTTP auth, physical selection, stale/duplicate/PC answer and
   assert.equal(approval.status, 403); // enabling ordinary questions never enables operation approval
 });
 
-test('App pipe uses exact native card reply and caller/target chat identity', async t => {
+test('App monitoring and native question input use separate connections', async t => {
+  const { NativeChatReply } = require('../scripts/native_chat_reply.cjs');
+  const { fixture, state } = require('./helpers/native_reply_fixture.cjs');
+  const q = { ...question, originalQuestion: question.question, originalOptions: ['YES', 'NO', '後で決める'] };
+  const native = await fixture(t, { getState: id => state(id, q) });
   let received;
   const server = net.createServer(socket => {
     let data = Buffer.alloc(0);
@@ -126,7 +130,7 @@ test('App pipe uses exact native card reply and caller/target chat identity', as
       data = Buffer.concat([data, chunk]);
       while (data.length >= 4 && data.length >= data.readUInt32LE() + 4) {
         const size = data.readUInt32LE(), m = JSON.parse(data.subarray(4, size + 4)); data = data.subarray(size + 4);
-        const result = m.method === 'tools/list' ? { tools: [{ name: 'send_message_to_thread', namespace: 'codex_app' }] } : { success: true, contentItems: [] };
+        const result = m.method === 'tools/list' ? { tools: ['list_threads','read_thread'].map(name=>({name,namespace:'codex_app'})) } : { success: true, contentItems: [] };
         if (m.method === 'tools/call') received = m;
         const b = Buffer.from(JSON.stringify({ id: m.id, jsonrpc: '2.0', result })), h = Buffer.alloc(4); h.writeUInt32LE(b.length);
         socket.write(Buffer.concat([h, b.subarray(0, 3)])); setImmediate(() => socket.write(b.subarray(3)));
@@ -134,13 +138,16 @@ test('App pipe uses exact native card reply and caller/target chat identity', as
     });
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const client = new CodexAppClient({ pipePath: { host: '127.0.0.1', port: server.address().port }, sessionId });
+  const client = new CodexAppClient({ pipePath: { host: '127.0.0.1', port: server.address().port }, sessionId,
+    nativeReplies: new NativeChatReply(native) });
   t.after(() => { client.close(); return new Promise(resolve => server.close(resolve)); });
   await client.ready();
-  await client.reply({ ...question, originalQuestion: question.question, originalOptions: ['YES', 'NO', '後で決める'] }, 'option-2');
-  assert.equal(received.params.threadId, sessionId);
-  assert.equal(received.params.arguments.threadId, sessionId);
-  assert.deepEqual(JSON.parse(received.params.arguments.prompt.split('\n')[1]), [{ questionItemId: question.id, question: question.question, answer: '後で決める' }]);
+  await client.reply(q, 'option-2');
+  assert.equal(received, undefined);
+  const sent=native.mutations[0];
+  assert.equal(sent.params.conversationId, sessionId);
+  assert.deepEqual(JSON.parse(sent.params.input[0].text.split('\n')[1]), [{ questionItemId: question.id, question: question.question, answer: '後で決める' }]);
+  await assert.rejects(client.call('send_message_to_thread', {}), /Unsupported/);
 });
 
 test('watcher delivers an actual isolated device selection, but never replays an uncertain reply', async t => {

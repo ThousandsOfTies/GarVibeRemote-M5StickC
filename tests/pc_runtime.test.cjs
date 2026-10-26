@@ -50,20 +50,15 @@ test('PC configuration uses the same strict contract at every Node entry point a
   );
 });
 
-test('a reply revoked while reconnecting is rejected before any bytes are sent', async () => {
-  const client = new CodexAppClient({ pipePath: 'unused-fixture', sessionId: 'chat-a' });
+test('a reply revoked during native connection is rejected before any input is sent', async () => {
   let resume,
     writes = 0;
-  client.connect = () =>
-    new Promise((resolve) => {
-      resume = resolve;
-    });
-  client.socket = {
-    write: () => {
-      writes++;
-    },
-    destroy() {}
+  const nativeReplies = {
+    async reply(q,choice,session,beforeSend) {
+      await new Promise(resolve=>{resume=resolve}); beforeSend(); writes++;
+    }, close() {}
   };
+  const client = new CodexAppClient({ pipePath: 'unused-fixture', sessionId: 'chat-a', nativeReplies });
   const sending = client.reply(
     { id: 'original', originalQuestion: 'Fixture?', originalOptions: ['First', 'Second'] },
     'option-0'

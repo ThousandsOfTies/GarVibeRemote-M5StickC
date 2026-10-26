@@ -11,7 +11,7 @@ flowchart LR
     Monitor -.->|チャットごとに管理| Questions[question_service.cjs]
     Log --> Questions
     Questions <-->|認証付きHTTP /chat-questions| Status
-    Questions -->|実機回答 / Codex App Tools| App
+    Questions -->|実機回答 / ローカル連携IPC| App
     Hook[任意の監視用Codex Hook] -->|HTTP /events| Status
     Status <-->|認証付きWebSocket| Device[device_bridge.cjs]
     Device <-->|SPP または USB / JSON Lines| Plus2[Plus2 / CompactUi / LVGL]
@@ -90,10 +90,11 @@ Copilot監視や旧T-Watchのファームウェア／対話設定は取り込み
 通常のチャットで出す質問と、ツール実行の承認は別経路です。質問連携を有効にすると、
 Codex Appの`request_user_input_async`が表示した選択肢をPlus2へ自動転送します。
 Cで選び、Aで決定すると、元の質問IDと元の選択肢の文字列を使って同じチャットへ回答します。
-現在の返信経路はApp Toolsの`send_message_to_thread`による追加メッセージです。
-**回答の受信と、PC側の質問カードの終了は別です。** 2026-10-26時点で、利用中の接続口には
-質問カードを回答済みにする操作がなく、実機回答でPCのカードを自動的に閉じる処理は未対応です。
-PCにカードが残っていても、回答内容がチャットへ届いている場合があります。
+返信は`native_chat_reply.cjs`からCodex Appのローカル連携IPCへ渡します。
+元のチャットの最新の質問・選択肢・回答済み状態を照合し、通常のユーザー回答として送るため、
+PCの質問カードも回答済みになります。実行中は`thread-follower-steer-turn`、終了後は
+同じチャットへの`thread-follower-start-turn`を使い、モデルや権限設定は変更しません。
+元の質問が別のターンへ移った場合や、PCですでに回答済みの場合は送りません。
 質問が複数なら一問ずつ表示します。長い選択肢は本文にも番号付きで表示し、自動スクロールで読めます。
 
 ```powershell
@@ -114,7 +115,8 @@ flowchart LR
     Questions -->|認証付き HTTP /chat-questions| Status[PC状態ブリッジ]
     Status <-->|認証付きWS| Relay[device_bridge.cjs]
     Relay <-->|SPP / USB| Device[Plus2]
-    Questions -->|実機で選んだ回答 / Codex App Tools| Chat
+    Questions -->|実機で選んだ回答| Reply[native_chat_reply.cjs]
+    Reply -->|ローカル連携IPC / 通常のユーザー回答| Chat
     Status -->|認証付きWS| Feed[simulator_feed.cjs]
     Feed -->|閲覧専用WS| Simulator[Webシミュレータ]
 ```
@@ -126,12 +128,15 @@ flowchart LR
 - PCでの回答が履歴に記録済みなら、時計側の質問を取り下げます。送信直前にも再確認します。
 - 連携処理から5秒間更新が途絶えると時計から回答できなくなります。送達が不明な回答は
   PC内の配信記録に残し、再起動後も自動再送しません。PCで回答済みか確認してください。
-- `chat-answer-delivered`はCodex Appが返信メッセージを受け付けた状態です。元の質問カードの終了は保証しません。
+- `chat-answer-delivered`はCodex Appが通常のユーザー回答を受け付けた状態です。元の質問の完了処理もこの経路で行われます。
   `chat-answer-unconfirmed`は送達が不明で、自動再送しない状態です。ログへ質問文・回答文・トークンは出しません。
 - シミュレータは閲覧専用です。実機の回答を試すときに、PC側の選択肢を押した結果を実機入力と取り違えません。
 - ツール実行の許可・拒否や、同期型`request_user_input`への回答はこの実装の対象外です。
 
-ローカル履歴とApp Toolsの接続形式はCodex Appの版に依存する互換アダプターです。
+ローカル履歴、App Tools、連携IPCの接続形式はCodex Appの版に依存する互換アダプターです。
+2026-10-26にCodex App 26.1021.3705.0で、SPP実機回答とアプリ内部の回答済み状態を確認しました。
+連携IPCは公開された安定APIではありません。互換性を確認できなければ送信を止め、
+従来の委譲メッセージへ自動切り替えしません。元の質問の状態と送達不明の記録を確認してください。
 Appを再起動したら質問連携も起動し直してください。形式変更や接続不能時はPCで回答し、
 画面の自動クリックや別の質問への代理入力へ切り替えません。
 
