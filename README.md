@@ -115,8 +115,8 @@ python scripts/firmware.py flash --port $UsbCom --model m5stickc-plus2
 
 最初の書き込み前に8MBのバックアップとSHA256の記録を確認します。`flash`は自動バックアップを行いません。
 バックアップや接続設定はこの利用者のPC内に保存し、他人のファイルを流用・公開しません。
-書き込むのは`firmware/stickc-plus2`であり、共有App内の旧`m5stickc-client`ではありません。
-旧クライアントのA／B／Pの操作表やWi-Fi設定を流用せず、本ProductのC選択／A決定／B一覧を使います。
+書き込むのは`firmware/stickc-plus2`です。操作は本ProductのC選択／A決定／B一覧を使います。
+デバイス接続はUSB／SPPに限定し、Wi-FiクライアントとLAN向けの探索・中継は削除しました。
 
 ### 4. ペアリングと実機の通信試験を行う
 

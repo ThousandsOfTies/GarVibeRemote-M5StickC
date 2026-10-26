@@ -7,7 +7,7 @@ LCDは135×240、Aで決定、Bで一覧／戻る、C短押しで循環選択。
 状態の外枠は液晶端から2px内側の4px幅です。入力待ちは赤、実行中は緑、待機時はグレーです。
 セッション名も、枠と同じ赤・緑・グレーの背景と黒文字で表示します。一覧も同じ配色です。
 本体のC（GPIO35）はM5Unified上では`BtnPWR`として取得します。`BtnC`は使用しません。
-新しい実機用wrapperです。旧共有`m5stickc-client`の画面やWi-Fiコードは使用しません。
+実機用wrapperはこのProduct内に置き、共有AppからはCompactUiを組み込みます。
 
 対象は**M5StickC Plus2のみ**です。USBシリアル機器の型番では本体を識別できません。
 初代StickC／Plus／T-Watch用に、この環境を書き込まないでください。
@@ -23,7 +23,7 @@ LCDは135×240、Aで決定、Bで一覧／戻る、C短押しで循環選択。
 | `scripts/shared_ui.py` | ビルド時に共有UI・フォント・LVGL設定を参照するためのパス設定 |
 
 この実機の描画・操作は共有UIへ、通信のフレーム処理と確認状態は独立した部品へ分けています。
-共有Appの`m5stickc-client/src/main.cpp`は旧Wi-Fi版で、このビルドからは参照しません。
+旧Wi-Fiクライアントは削除し、実機ファームウェアはこのUSB／SPP版に一本化しています。
 実機を更新せずに部品を検証する場合は、Productの`tests/device_link.cpp`と`tests/ui.test.mjs`を使います。
 
 ## 書き込み
