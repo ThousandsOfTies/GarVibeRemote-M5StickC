@@ -24,14 +24,22 @@ firmware/stickc-plus2 and reuses CompactUi unchanged. scripts/firmware.py builds
 backs up and flashes the confirmed Plus2; scripts/serial_demo.py tests physical
 input over USB. scripts/device_bridge.cjs connects the existing selected-session
 Codex bridge over SPP or USB; device_trial.cjs is an isolated physical test.
-BLE and automatic collection of multiple live sessions remain unimplemented.
+scripts/session_monitor.cjs collects up to 16 local Codex chats across projects,
+one project or explicit ids, using App Tools. It keeps per-chat question workers,
+reply allowlists and delivery journals. Ordinary physical replies must retain
+session + native question + choice identities. No automatic task creation.
+BLE remains unimplemented. Do not confuse synthetic multi-session tests with
+two independent real chats answered on the physical device.
 scripts/simulator_feed.cjs is a separate read-only localhost WebSocket feed for
 the ?live=1 panel. Keep private tokens out of public assets, URLs and browsers;
 browser input must not become a real approval. Static serving stays separate.
-scripts/chat_questions.cjs separately mirrors selected local Codex App asynchronous
+scripts/chat_questions.cjs separately mirrors local Codex App asynchronous
 choice cards and returns actual physical selections to that same card/chat through
 App Tools. See docs/DEVICE_CONNECTION.md. Do not synthesize human answers, forward
 tool approvals, replay uncertain deliveries or automate the Codex desktop UI.
+Keep roster order/membership stable at capacity; a background update must not
+reset another session's reading position or focused option. Use a stable display
+budget per card and preserve the device's 16-session / 64 KiB JSONL limits.
 Its rollout/App Tools compatibility is version-specific; free text and synchronous
 request_user_input stay on the PC. It changes no hook definitions or trust records.
 PC loopback test replies are synthetic and never user approval.

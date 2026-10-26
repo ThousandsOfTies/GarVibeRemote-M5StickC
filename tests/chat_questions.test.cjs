@@ -66,6 +66,13 @@ test('native log matches call/index, multiple questions, PC replies, acceptance 
   assert.throws(() => m.consume({ type: 'session_meta', payload: { id: 'another-chat' } }));
   const old = records('call_ancient'); old[0].timestamp = '2000-01-01T00:00:00Z'; old.forEach(r => m.consume(r));
   assert.equal(m.pending().length, 1);
+  records('call_too_many_lines', [{ title: '\n'.repeat(1600)+'質問', options: ['はい','いいえ'] }]).forEach(r => m.consume(r));
+  assert.equal(m.pending().length, 1);
+  const cancelled = records('call_cancelled');
+  cancelled[0].payload.internal_chat_message_metadata_passthrough = { turn_id: 'cancelled-turn' };
+  cancelled.forEach(r => m.consume(r)); assert.equal(m.pending().length,2);
+  m.consume({ type: 'event_msg', payload: { type: 'turn_aborted', turn_id: 'cancelled-turn' } });
+  assert.equal(m.pending().length,1);
   assert.ok(Buffer.byteLength(displayLabel('長い選択肢'.repeat(80))) <= 128);
 });
 

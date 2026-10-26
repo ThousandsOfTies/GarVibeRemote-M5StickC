@@ -25,7 +25,7 @@ SetupError=settings.SetupError
 
 def source_hash():
     digest=hashlib.sha256()
-    files=[APP/'src'/name for name in ('codexBridge.ts','codexInteraction.ts','codexChatQuestions.ts','codexStatus.ts','protocol.ts')]
+    files=[APP/'src'/name for name in ('codexBridge.ts','codexInteraction.ts','codexChatQuestions.ts','codexSessions.ts','codexStatus.ts','protocol.ts')]
     files+=[ROOT/'config/connection-node/package-lock.json']
     files+=[ROOT/'scripts/device_bridge.cjs',ROOT/'scripts/simulator_feed.cjs']
     for path in files:digest.update(path.name.encode());digest.update(path.read_bytes())
@@ -99,6 +99,13 @@ def bridge_status(config):
         if not isinstance(current,dict):return {'state':'error'}
         session=current.get('session') or {}
         if not isinstance(session,dict):return {'state':'error'}
+        if current.get('type')=='sessions':
+            rows=current.get('sessions') or []
+            expected=config.get('sessionIds',[]) if config.get('sessionScope')=='manual' else [config.get('sessionId')]
+            actual={(s.get('session') or {}).get('id') for s in rows}
+            return {'state':'reachable','sessionMatches':all(s in actual for s in expected),
+                    'sessionCount':len(rows),'scope':config.get('sessionScope'),
+                    'collectorReady':not any((s.get('ui') or {}).get('id')=='session-collector-unavailable' for s in rows)}
         return {'state':'reachable','sessionMatches':session.get('id')==config.get('sessionId')}
     except urllib.error.HTTPError as error:return {'state':'authentication-error' if error.code in (401,403) else 'error'}
     except (OSError,ValueError,urllib.error.URLError):return {'state':'offline'}
@@ -126,7 +133,7 @@ def doctor(path):
         try:
             config=settings.read_config(path)
             report.update(config='ready',selectedSession=bool(config.get('sessionId')),
-                          bridge=bridge_status(config),hooks=hook_status(config))
+                          sessionScope=config.get('sessionScope','single'),bridge=bridge_status(config),hooks=hook_status(config))
         except SetupError:report['config']='invalid'
     return report
 
@@ -144,7 +151,7 @@ def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config',type=Path,default=CONFIG)
     commands=parser.add_subparsers(dest='command',required=True)
-    for name in ('doctor','ports','prepare','bridge','test','questions'):commands.add_parser(name)
+    for name in ('doctor','ports','prepare','bridge','test','questions','sessions'):commands.add_parser(name)
     sub=commands.add_parser('simulator-feed');sub.add_argument('--port',type=int,default=8775);sub.add_argument('--panel-port',type=int,default=8772)
     for name in ('device','device-test'):
         sub=commands.add_parser(name);sub.add_argument('--port',required=True);sub.add_argument('--transport',required=True,choices=['usb','spp'])
@@ -153,6 +160,8 @@ def main(argv=None):
         sub.add_argument('--session-id');sub.add_argument('--label');sub.add_argument('--port',type=int)
         sub.add_argument('--import-config',type=Path)
         sub.add_argument('--chat-questions',action='store_true',default=None)
+        sub.add_argument('--session-scope',choices=['single','project','local','manual'])
+        sub.add_argument('--include-session',dest='session_ids',action='append')
         if name=='setup':sub.add_argument('--replace-product',type=Path)
     sub=commands.add_parser('hooks');sub.add_argument('--project',type=Path,required=True);sub.add_argument('--replace-product',type=Path)
     sub=commands.add_parser('install-skill');sub.add_argument('--destination',type=Path,default=Path.home()/'.agents/skills/stickc-setup')
@@ -165,7 +174,7 @@ def main(argv=None):
         elif args.command=='install-skill':install_skill(args.destination);print('stickc-setupスキルを配置しました。')
         elif args.command in ('configure','setup'):
             if args.command=='setup':prepare_dependencies()
-            settings.configure(args.config,project=args.project,session=args.session_id,label=args.label,port=args.port,import_config=args.import_config,chat_questions=args.chat_questions)
+            settings.configure(args.config,project=args.project,session=args.session_id,label=args.label,port=args.port,import_config=args.import_config,chat_questions=args.chat_questions,session_scope=args.session_scope,session_ids=args.session_ids)
             if args.command=='setup':
                 settings.prepare_hooks(args.project,args.config,replace_product=args.replace_product)
                 print('Hook定義を準備しました。Codex側でレビュー・信頼してください。')
@@ -177,13 +186,15 @@ def main(argv=None):
             node=shutil.which('node')
             if not node or not runtime_ready():raise SetupError('prepareでNode.jsの実行環境を先に準備してください。')
             if args.command=='test':run([node,ROOT/'scripts/connection_test.cjs',RUNTIME])
-            elif args.command=='questions':
+            elif args.command in ('questions','sessions'):
                 config=settings.read_config(args.config)
-                if not config.get('chatQuestions'):
+                if args.command=='questions' and not config.get('chatQuestions'):
                     raise SetupError('configure --project PATH --chat-questionsで質問連携を有効にしてください。')
+                if args.command=='sessions' and config.get('sessionScope','single')=='single':
+                    raise SetupError('configure --project PATH --session-scope projectで監視範囲を設定してください。')
                 if not os.environ.get('CODEX_APP_TOOLS_PIPE_PATH'):
                     raise SetupError('質問連携は、対象チャットを開いたCodex Appから起動してください。')
-                run([node,ROOT/'scripts/chat_questions.cjs','--config',args.config.resolve()])
+                run([node,ROOT/'scripts'/('session_monitor.cjs' if args.command=='sessions' else 'chat_questions.cjs'),'--config',args.config.resolve()])
             elif args.command=='simulator-feed':
                 settings.read_config(args.config)
                 if not all(1<=p<=65535 for p in (args.port,args.panel_port)):raise SetupError('接続ポートは1〜65535で指定してください。')

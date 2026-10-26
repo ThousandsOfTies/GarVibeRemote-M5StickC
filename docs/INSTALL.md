@@ -34,15 +34,18 @@ python scripts/setup_remote.py install-skill
 
 `PROJECT`は監視するプロジェクトのフォルダー、`CHAT_ID`は対象チャットのIDです。
 チャットのIDを指定しない場合、既存PCブリッジは受け取った最新セッションの状態を表示します。
-実セッション一覧の自動収集は未実装です。デバイス中継は選択中の1セッションを新画面へ渡します。
+既存設定の既定値は`sessionScope: single`です。複数の実チャットを収集する場合は、次のように範囲を指定します。
 
 ```powershell
 python scripts/setup_remote.py configure --project "PROJECT" --session-id "CHAT_ID" --label "作業名"
 python scripts/setup_remote.py hooks --project "PROJECT"
+# 複数監視の例（既存の起動元CHAT_IDを保持）:
+python scripts/setup_remote.py configure --project "PROJECT" --session-scope local --chat-questions
 ```
 
 設定は`artifacts/connection/local.json`に保存します。トークンを自動生成し、再実行時も保持します。
 設定にはPC側の監視先を保存し、実機用COM番号や対話的な実行承認は設定しません。
+`--session-scope`は`single`・`project`・`local`・`manual`から選びます。詳しくは[複数監視](DEVICE_CONNECTION.md#5-複数のcodexチャットを監視する)を参照してください。
 実行コマンド・ログ・Gitや公開用simulationへトークンをコピーしないでください。
 
 `setup --project "PROJECT" ...`は`prepare`、`configure`、`hooks`をまとめて行う入口です。
@@ -71,6 +74,8 @@ CLIなら`codex -C "PROJECT"`から`/hooks`を使えます。設定ファイル�
 
 ```powershell
 python scripts/setup_remote.py bridge
+# 複数監視の場合はCodex App内の別の実行セッションで:
+python scripts/setup_remote.py sessions
 # 別の端末で:
 python scripts/setup_remote.py doctor
 python scripts/setup_remote.py ports
@@ -87,6 +92,8 @@ python scripts/setup_remote.py ports
 `deviceFirmware`は`spp-usb-source`、`deviceTransports`は`usb-serial`と`bluetooth-spp`、
 `bleTransport`は`not-implemented`です。`deviceTransport: not-checked`と`deviceInput: not-checked`は、
 この診断では実際の接続・物理入力を検査していないことを表します。
+複数監視では`sessionScope`、`bridge.collectorReady`、`bridge.sessionCount`も表示します。
+`collectorReady: false`は一覧がまだ届いていないか更新期限が切れた状態で、単にPCブリッジが到達可能なこととは区別します。
 
 `ports`はWindowsのUSB／Bluetoothポートを区別して列挙する診断機能です。
 COM番号だけから機種や送信方向、BLE接続の可否を判定しません。BLEはシリアルCOMと別の接続方式です。
@@ -95,7 +102,7 @@ COM番号だけから機種や送信方向、BLE接続の可否を判定しま�
 
 チャットの選択式質問も実機から回答する場合は、[質問連携](DEVICE_CONNECTION.md#4-このチャットの選択式質問を実機へ通知する)
 を追加します。`configure --project YOUR_PROJECT --chat-questions`で有効にし、新版のPC状態ブリッジと
-Codex App内の`questions`を動かします。監視用Hookのレビューをやり直す必要はありません。
+Codex App内の`questions`（複数監視では`sessions`）を動かします。監視用Hookのレビューをやり直す必要はありません。
 実行承認の設定`watchInput`は無効のままです。
 
 | 表示・状態 | 対応 |

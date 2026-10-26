@@ -7,6 +7,7 @@ class CodexAppClient {
   constructor({ pipePath = process.env.CODEX_APP_TOOLS_PIPE_PATH, sessionId, timeoutMs = 8000 } = {}) {
     if (!pipePath || !/^[\w-]{1,128}$/.test(sessionId ?? '')) throw Error('Codex App connection is unavailable');
     this.pipePath = pipePath; this.sessionId = sessionId; this.timeoutMs = timeoutMs;
+    this.allowedSessionIds = new Set([sessionId]);
     this.nextId = 0; this.pending = new Map(); this.buffer = Buffer.alloc(0);
   }
   async connect() {
@@ -61,20 +62,43 @@ class CodexAppClient {
     const tool = result?.tools?.find(t => t.name === 'send_message_to_thread' && t.namespace === 'codex_app');
     if (!tool) throw Error('This Codex App does not expose chat replies');
   }
-  async reply(question, choiceId) {
+  allowReplies(ids) {
+    if (!Array.isArray(ids) || ids.length > 16 || ids.some(id => !/^[\w-]{1,128}$/.test(id)))
+      throw Error('Invalid monitored chats');
+    this.allowedSessionIds = new Set(ids);
+  }
+  async call(tool, args) {
+    if (!['list_threads','read_thread','send_message_to_thread'].includes(tool)) throw Error('Unsupported App operation');
+    const result = await this.request('tools/call', {
+      namespace: 'codex_app', tool, callerSource: 'codex', threadId: this.sessionId,
+      turnId: `viberemote-${randomUUID()}`, callId: `viberemote-${randomUUID()}`, arguments: args
+    });
+    if (!result?.success) throw Error('Codex App did not accept the request');
+    return result;
+  }
+  async listThreads() {
+    const result = await this.call('list_threads', { limit: 50 });
+    const data = JSON.parse(result.contentItems.find(i => i.type === 'inputText')?.text ?? 'null');
+    if (!data || !Array.isArray(data.threads) || !Array.isArray(data.pinnedThreads))
+      throw Error('Unsupported Codex chat inventory');
+    return [...data.pinnedThreads, ...data.threads];
+  }
+  async readThread(id) {
+    const result = await this.call('read_thread', { threadId: id, hostId: 'local', turnLimit: 1,
+      includeOutputs: false, maxOutputCharsPerItem: 0 });
+    const data = JSON.parse(result.contentItems.find(i => i.type === 'inputText')?.text ?? 'null');
+    if (!data?.thread || data.thread.id !== id) throw Error('Unsupported Codex chat details');
+    return data.thread;
+  }
+  async reply(question, choiceId, sessionId = this.sessionId) {
+    if (!this.allowedSessionIds.has(sessionId)) throw Error('The question chat is no longer monitored');
     const option = question.originalOptions[Number(choiceId.replace(/^option-/, ''))];
     if (!/^option-\d+$/.test(choiceId) || typeof option !== 'string' || !question.id || !question.originalQuestion)
       throw Error('Invalid native chat reply');
     const prompt = '<send_user_message_question_reply>\n' + JSON.stringify([{
       questionItemId: question.id, question: question.originalQuestion, answer: option
     }]) + '\n</send_user_message_question_reply>';
-    const result = await this.request('tools/call', {
-      namespace: 'codex_app', tool: 'send_message_to_thread', callerSource: 'codex',
-      threadId: this.sessionId, turnId: `viberemote-${randomUUID()}`, callId: `viberemote-${randomUUID()}`,
-      arguments: { threadId: this.sessionId, prompt }
-    });
-    if (!result?.success) throw Error('Codex App did not accept the reply');
-    return result;
+    return this.call('send_message_to_thread', { threadId: sessionId, hostId: 'local', prompt });
   }
   close() { this.socket?.destroy(); }
 }

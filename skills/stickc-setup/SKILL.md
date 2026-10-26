@@ -15,8 +15,10 @@ The default simulator uses local mock data. For simultaneous live viewing,
 run `simulator-feed` separately from static HTTP and open `?live=1` on the panel.
 The feed is read-only, validates the local page origin and keeps tokens on the PC.
 SPP/USB firmware shares its real LVGL UI.
-The existing Codex bridge sends one selected (or latest observed) session;
-automatic live multi-session collection and BLE are not implemented.
+The Codex bridge retains backward-compatible single-session mode. For multiple
+live chats, configure an explicit scope (project/local/manual) and run `sessions`
+from Codex App. It discovers local Codex chats and handles up to 16 independently.
+BLE is not implemented. Read section 5 of docs/DEVICE_CONNECTION.md for limits.
 Do not flash the old shared M5StickC client as this portrait UI.
 
 For an explicit installation request, read `firmware/stickc-plus2/README.md`.
@@ -49,17 +51,31 @@ for private settings. Retain existing tokens and session selections. To migrate
 settings use `--import-config OLD_CONFIG`; it imports only PC facts and drops
 old hardware ports and interactive approval settings. Never print secrets.
 
-For explicit chat-choice integration, read section 4 of `docs/DEVICE_CONNECTION.md`.
+For explicit chat-choice integration, read sections 4–5 of `docs/DEVICE_CONNECTION.md`.
 `configure --project PATH --chat-questions` enables ordinary asynchronous choice
 cards for the selected local Codex chat; it leaves operation approvals disabled.
-Start the rebuilt PC bridge, then run `questions` as a separate process from
-Codex App (its local App Tools connection is required). It reads only that chat's
-rollout and returns a real physical choice to the original native card and chat.
+For single mode, start the rebuilt PC bridge, then run `questions` separately from
+Codex App (its local App Tools connection is required). In multi-session mode use
+`sessions`; do not also start questions. It reads the enrolled chats' rollouts and
+returns a real physical choice to the original native card and chat, preserving
+both session and question identities. It does not create or resume test chats.
 It changes no hooks/trust records. Free text, synchronous request_user_input,
-tool approvals and other chats stay on the PC. On App restart, restart questions.
+tool approvals and out-of-scope chats stay on the PC. On App restart, restart the
+collector from that App so it receives the current local App Tools connection.
 Never synthesize human replies or replay an unconfirmed delivery; inspect the
 PC card instead. Questions older than 15 minutes are not forwarded. A mock test
 can validate the adapter but cannot prove an actual native card/device round trip.
+
+Ask or infer the authorized scope before enrollment: project is the same working
+directory; local includes this PC's projects; manual needs --include-session IDs.
+Keep an anchor --session-id even when monitoring multiple chats. A local scope
+request authorizes actual device answers only to enrolled native choice cards;
+never message another chat as part of a synthetic test. Discovery uses the recent
+50 plus pinned App inventory and revalidates already enrolled chats individually.
+At capacity, keep existing members until a slot opens. Show only local Codex,
+never ChatGPT/cloud/other hosts. Existing monitor hooks need no rewrite just for
+multi-session collection; status can be read from App Tools. Do not claim the
+full real-device multi-chat path is verified by mocked integration tests alone.
 
 `hooks --project PATH` writes monitoring hooks. `--replace-product OLD_PRODUCT`
 explicitly replaces that Product's sender while preserving unrelated hooks.

@@ -17,6 +17,23 @@ setup=importlib.util.module_from_spec(spec);spec.loader.exec_module(setup)
 settings=setup.settings
 
 class SetupTests(unittest.TestCase):
+    def test_multi_session_scope_preserves_token_and_requires_valid_explicit_members(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);config=root/'private/local.json'
+            single=settings.configure(config,project=root,session='anchor-chat')
+            self.assertEqual(single['sessionScope'],'single')
+            multi=settings.configure(config,project=root,session_scope='local',chat_questions=True)
+            self.assertEqual(multi['token'],single['token']);self.assertEqual(multi['sessionScope'],'local')
+            self.assertFalse(multi['watchInput']);self.assertTrue(multi['chatQuestions'])
+            self.assertEqual(settings.configure(config,project=root)['sessionScope'],'local')
+            before=config.read_bytes()
+            for ids in ([],['a','a'],['../bad'],[{}],list(map(str,range(17)))):
+                with self.assertRaises(settings.SetupError):settings.configure(config,project=root,session_scope='manual',session_ids=ids)
+                self.assertEqual(config.read_bytes(),before)
+            manual=settings.configure(config,project=root,session_scope='manual',session_ids=['a','b'])
+            self.assertEqual(manual['sessionIds'],['a','b'])
+            self.assertFalse(manual['watchInput'])
+
     def test_chat_questions_are_opt_in_preserved_and_separate_from_execution_approvals(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);config=root/'private/local.json'

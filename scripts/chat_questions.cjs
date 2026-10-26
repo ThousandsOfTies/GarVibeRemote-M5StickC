@@ -20,6 +20,10 @@ class NativeQuestionLog {
     const p = record?.payload;
     if (!p) return;
     if (record.type === 'session_meta' && p.id !== this.sessionId) throw Error('Wrong Codex chat log');
+    if (record.type === 'event_msg' && p.type === 'turn_aborted' && typeof p.turn_id === 'string') {
+      for (const call of this.calls.values()) if (call.turnId === p.turn_id) call.accepted = false;
+      return;
+    }
     if (record.type !== 'response_item') return;
     if (p.type === 'function_call' && p.name?.split('.').at(-1) === 'request_user_input_async') {
       if (this.calls.has(p.call_id) || !/^[\w-]{1,128}$/.test(p.call_id ?? '')) return;
@@ -36,13 +40,16 @@ class NativeQuestionLog {
         const id = JSON.stringify(['request_user_input_async', p.call_id, index]);
         // Full choices remain readable in the scrolling body even when a button label is ellipsized.
         const message = q.title + '\n\n選択肢\n' + q.options.map((label, i) => `${i + 1}. ${label}`).join('\n');
-        if (message.length > 2000) continue;
+        // CompactUi uses signed LVGL coordinates. Pathological line breaks must
+        // not cause one card to reject the entire multi-session snapshot.
+        if (message.length > 2000 || message.split('\n').length > 200) continue;
         questions.push({ id, question: message, originalQuestion: q.title, originalOptions: [...q.options],
           options: q.options.map((label, i) => ({ id: `option-${i}`, label: displayLabel(`${i + 1}. ${label}`) })) });
       }
       const createdAt = Date.parse(record.timestamp);
       if (!Number.isFinite(createdAt)) return;
-      this.calls.set(p.call_id, { accepted: false, questions, createdAt });
+      this.calls.set(p.call_id, { accepted: false, questions, createdAt,
+        turnId: p.internal_chat_message_metadata_passthrough?.turn_id });
     } else if (p.type === 'function_call_output' && this.calls.has(p.call_id)) {
       let output; try { output = JSON.parse(p.output); } catch { return; }
       this.calls.get(p.call_id).accepted = output?.accepted === true;
@@ -109,7 +116,7 @@ function findRollout(sessionId, root = path.join(process.env.CODEX_HOME || path.
   return matches[0];
 }
 
-async function startChatQuestions({ config, file, app, journal, intervalMs = 500, onEvent = () => {} }) {
+async function startChatQuestions({ config, file, app, journal, intervalMs = 500, displayContext = '', onEvent = () => {} }) {
   if (!config.chatQuestions || !config.sessionId) throw Error('Enable chat questions for the selected session');
   const model = new NativeQuestionLog(config.sessionId);
   const tail = new RolloutTail(file ?? findRollout(config.sessionId), model);
@@ -135,13 +142,17 @@ async function startChatQuestions({ config, file, app, journal, intervalMs = 500
       method: 'POST', signal: AbortSignal.timeout(3000),
       headers: { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ kind: 'chat-choice', sessionId: config.sessionId, owner,
-        questions: questions.map(({ id, question, options }) => ({ id, question, options })),
+        questions: questions.map(({ id, question, options }) => {
+          const withContext = displayContext ? `プロジェクト：${displayContext}\n${question}` : question;
+          return { id, question: withContext.length <= 2000 && withContext.split('\n').length <= 200 ? withContext : question, options };
+        }),
         delivered: [...delivered], failed: [...failed], release })
     });
     if (!response.ok) throw Error(`Chat question bridge returned ${response.status}`);
     return response.json();
   };
   async function tick() {
+    if (app?.available && !app.available()) throw Error('Codex chat inventory is unavailable');
     await tail.read();
     // A disconnected App must not leave a selectable question on the device.
     if (!app && !client.socket) await client.ready();
@@ -194,6 +205,10 @@ async function main() {
   const i = process.argv.indexOf('--config');
   if (i < 0 || !process.argv[i + 1]) throw Error('Use --config with private PC settings');
   const config = JSON.parse(fs.readFileSync(process.argv[i + 1], 'utf8').replace(/^\uFEFF/, ''));
+  if (config.sessionScope && config.sessionScope !== 'single') {
+    await require('./session_monitor.cjs').main(config);
+    return;
+  }
   const service = await startChatQuestions({ config,
     journal: path.resolve(__dirname, '../.gar/chat-questions', `${config.sessionId}.json`),
     onEvent: event => console.log(JSON.stringify(event)) });

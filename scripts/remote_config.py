@@ -40,9 +40,16 @@ def read_config(path: Path) -> dict:
         raise SetupError('接続ポートは1〜65535で指定してください。')
     if session is not None and (not isinstance(session, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', session)):
         raise SetupError('セッションIDの形式が不正です。')
+    if config.get('sessionScope','single') not in ('single','project','local','manual'):
+        raise SetupError('セッション監視範囲の形式が不正です。')
+    if config.get('sessionScope')=='manual' and (not isinstance(config.get('sessionIds'),list) or
+            not 1<=len(config['sessionIds'])<=16 or
+            any(not isinstance(s,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}',s) for s in config['sessionIds']) or
+            len(set(config['sessionIds']))!=len(config['sessionIds'])):
+        raise SetupError('指定チャットは重複しないIDを1〜16個設定してください。')
     return config
 
-def configure(path: Path, *, project: Path, session=None, label=None, port=None, import_config: Path | None=None, chat_questions=None) -> dict:
+def configure(path: Path, *, project: Path, session=None, label=None, port=None, import_config: Path | None=None, chat_questions=None, session_scope=None, session_ids=None) -> dict:
     path = private_path(path)
     if not project.is_dir():
         raise SetupError('監視するプロジェクトのフォルダーが存在しません。')
@@ -61,6 +68,17 @@ def configure(path: Path, *, project: Path, session=None, label=None, port=None,
               'freshnessMs':previous.get('freshnessMs',90000), 'watchInput':False,
               'chatQuestions':chat_questions if chat_questions is not None else previous.get('chatQuestions',False)}
     config['chatQuestionSources']=['m5stickc-plus2-spp','m5stickc-plus2-usb']
+    config['sessionScope']=session_scope if session_scope is not None else previous.get('sessionScope','single')
+    if session_ids is not None:config['sessionIds']=session_ids
+    if config['sessionScope'] not in ('single','project','local','manual'):
+        raise SetupError('セッション監視範囲はsingle・project・local・manualで指定してください。')
+    if config['sessionScope']!='single' and not config['sessionId']:
+        raise SetupError('複数セッションの監視には起動元チャットIDを指定してください。')
+    if config['sessionScope']=='manual' and (not isinstance(config.get('sessionIds'),list) or
+            not 1<=len(config['sessionIds'])<=16 or
+            any(not isinstance(s,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}',s) for s in config['sessionIds']) or
+            len(set(config['sessionIds']))!=len(config['sessionIds'])):
+        raise SetupError('指定チャットは重複しないIDを1〜16個設定してください。')
     for key in ('sppPort','sppBaudRate','firmware','firmwarePath','deviceTransport'):
         config.pop(key,None)
     config.setdefault('token',secrets.token_urlsafe(32))

@@ -1,7 +1,8 @@
 # GarVibeRemote-M5StickC
 
 PCから離れている間も、M5StickC Plus2でCodexの状態を確認し、チャットの選択式質問に回答するアプリです。
-**Cで選択、Aで決定、Bでセッション一覧**。長い質問と選択肢は縦に自動スクロールします。
+**Cで選択、Aで決定、Bでセッション一覧**。複数のローカルCodexチャットを監視し、切り替えて回答できます。
+長い質問と選択肢は縦に自動スクロールします。
 通信はBluetooth Classic SPP、またはUSBシリアルです。実機から元のチャットへの回答まで動作確認しています。
 
 通常の導入は、以下の実機向け手順を使ってください。**シミュレータの起動、Emscripten、WSLは不要です。**
@@ -18,6 +19,7 @@ README.mdの「導入を担当するAIへ」と、そこから参照される手
 シミュレータは省略し、実機での状態監視と、このCodexチャットの選択式質問への回答まで接続してください。
 既存アプリをバックアップしてから、このリポジトリのPlus2用ファームウェアを書き込んでください。
 監視するプロジェクトとチャット、USBとBluetoothのCOM番号は、この環境で確認してください。
+監視範囲を「同じプロジェクト」「このPCの全プロジェクト」「指定チャット」から確認してください。
 USBケーブルの接続、ペアリングの番号照合、Hookのレビュー、実機のボタン操作は私に案内してください。
 そのほかのコマンド実行や設定生成は進め、実機から元の質問に回答が戻ったことを確認して結果を報告してください。
 不足する条件があれば、何が足りず、どこまで完了したかを説明してください。
@@ -74,11 +76,12 @@ GitHubの取得権限や本人のサインインが不足している場合は�
 | 変数 | AIが確認する内容 |
 | --- | --- |
 | `$MonitorProject` | ユーザーが監視したいプロジェクトの絶対パス。Productの保存先とは限らない |
-| `$MonitorChatId` | 監視したいローカルCodexチャットのID。Appのメタデータやチャット一覧から確認し、推測しない |
+| `$MonitorChatId` | 起動元のローカルCodexチャットID。Appのメタデータやチャット一覧から確認し、推測しない。複数監視でもこのIDを接続の起点にする |
 | `$UsbCom` | `ports`でUSBとして現れる、接続したPlus2の書き込み用ポート |
 | `$SppCom` | WindowsでPlus2に対応すると確認したBluetoothの**発信**ポート。USB用・着信用とは別 |
 
-チャットを特定できない場合はユーザーに確認します。質問連携には明示したチャットIDが必要です。
+チャットを特定できない場合はユーザーに確認します。質問連携には明示した起動元チャットIDが必要です。
+監視範囲も確認してください。以下は同じプロジェクトの例です。全プロジェクトなら`--session-scope local`へ変更します。
 
 ### 2. PCの実行環境を準備する
 
@@ -137,7 +140,7 @@ USBで使う場合は`$UsbCom`と`--transport usb`に置き換えます。USBと
 ### 5. 監視するプロジェクトとチャットを設定する
 
 ```powershell
-python scripts/setup_remote.py configure --project $MonitorProject --session-id $MonitorChatId --label "作業名" --chat-questions
+python scripts/setup_remote.py configure --project $MonitorProject --session-id $MonitorChatId --label "作業名" --session-scope project --chat-questions
 python scripts/setup_remote.py hooks --project $MonitorProject
 ```
 
@@ -159,22 +162,24 @@ AIは起動したプロセスとログの保存先を把握し、他の用途の
 | --- | --- | --- |
 | PC状態ブリッジ | `python scripts/setup_remote.py bridge` | Hookの状態と質問を認証付きで配信する。既定はlocalhost:39275 |
 | 実機中継 | `python scripts/setup_remote.py device --port $SppCom --transport spp` | PCブリッジとPlus2のSPP通信をつなぐ |
-| チャット質問連携 | `python scripts/setup_remote.py questions` | 対象チャットの選択式質問を取り出し、実機の回答を元の質問へ返す |
+| 複数チャットの収集・質問連携 | `python scripts/setup_remote.py sessions` | 許可した範囲のチャット一覧・状態・選択式質問を取り出し、実機回答を元のチャットへ返す |
 
-**`questions`はCodex App内のローカル実行機能から起動します。** App Toolsへの接続情報が環境に提供されることが必要です。
+**`sessions`はCodex App内のローカル実行機能から起動します。** App Toolsへの接続情報が環境に提供されることが必要です。
 通常のPowerShellにその情報がない場合は、Codex Appへ起動を依頼してください。
 接続情報を捏造したり、Codexの画面を自動クリックする代替方式へ切り替えたりしません。
 通常の実機利用ではHTTPサーバやシミュレータを起動しません。
+1チャットだけを固定する場合は`--session-scope single`で設定し、`sessions`の代わりに従来の`questions`を使います。
 
 ### 7. 元のチャットまでの往復を確認する
 
 導入完了と報告する前に、次を確認します。
 
-- `doctor`でPCブリッジへ接続でき、監視先チャットが設定と一致している。
+- `doctor`でPCブリッジへ接続でき、複数監視では`collectorReady: true`と監視対象を確認できる。
 - 実機中継の`device-ready`を確認でき、ユーザーが実機の表示とA／B／Cの操作を確認した。
 - 対象Codexで実際に作業し、実行中・待機中などの状態変化が実機へ届く。
 - **対象チャットで新しい選択式の確認質問を出し**、ユーザーが実機のC→Aで回答する。PC側のカードは押さない。
 - `chat-answer-delivered`の`source: m5stickc-plus2-spp`（USBでは`m5stickc-plus2-usb`）と、**元の質問への回答の反映**を確認する。
+- 複数チャットを使う場合は、別々の実チャット2つの質問が一覧に入り、B→C→Aで切り替えて回答した結果が、それぞれの元の質問へ1回ずつ戻る。
 
 PC内の試験、実機専用の試験用質問、チャットの本物の質問は分けて報告します。
 AIが仮の回答を注入した結果を、ユーザーの実機操作や別の操作への許可として扱いません。
@@ -196,7 +201,8 @@ AIが仮の回答を注入した結果を、ユーザーの実機操作や別の
 ## 次回の起動・うまく動かないとき
 
 次回はAIへ「このREADMEとstickc-setupを読んで、保存済み設定で実機接続と質問連携を再開して」と依頼できます。
-通常は再書き込み・再ペアリング・Hook再登録は不要です。監視したいチャットが変わった場合は設定を更新します。
+通常は再書き込み・再ペアリング・Hook再登録は不要です。複数監視では範囲内で新しく開いたチャットを自動検出します。
+監視範囲や起動元チャットを変えたい場合は設定を更新し、対象の収集処理を起動し直します。
 Codex Appを再起動した場合、質問連携もそのAppから起動し直します。Windows再起動後は3つの処理の起動状態を確認します。
 
 | 状況 | 最初に確認すること |
@@ -205,14 +211,18 @@ Codex Appを再起動した場合、質問連携もそのAppから起動し直�
 | USB用COMがない | データ通信対応ケーブル、本体の電源、接続ポート。BluetoothのCOMへ書き込まない |
 | OFFLINE／`serial-open-failed` | 実機の電源、ペアリング先の発信COM、同じポートを使う別の中継 |
 | 接続済みだが状態が変わらない | 監視先のプロジェクト／チャットID、Hookの実行とレビュー状況 |
-| 状態は届くがチャットの質問は届かない | `--chat-questions`での設定、`questions`の動作、Codex Appの接続機能。15分以上前の質問ではなく新しい質問で試す |
+| 状態は届くがチャットの質問は届かない | `--chat-questions`での設定、`sessions`（単一監視は`questions`）の動作、Codex Appの接続機能。15分以上前の質問ではなく新しい質問で試す |
 | 回答の送達が不明 | PCの元の質問を確認する。不明な回答は自動再送しない |
 
 詳細な診断は[Windows導入ガイド](docs/INSTALL.md)と[SPP／USB接続ガイド](docs/DEVICE_CONNECTION.md)を参照してください。
 
 ## 対応範囲
 
-現在のPC連携は**選択したローカル1チャット**です。画面にはセッション一覧がありますが、実セッションの自動収集は未実装です。
+PC連携は**このPCのローカルCodexを最大16チャット**まで扱います。`single`、`project`、`local`、`manual`で範囲を選べます。
+ChatGPTの通常チャット、クラウド・別PCのCodexは含めません。通常は起動中のチャットを収集し、閉じた履歴で一覧を埋めません。
+収集はApp Toolsの「直近50件＋ピン留め」の一覧を入口にします。すでに採用したチャットは個別に再確認して維持しますが、
+一覧の外にある新規対象はピン留めまたは`manual`で指定してください。16件を超えると既存枠を保持し、空いた枠へ追加します。
+詳しい範囲指定と制限は[複数セッションの手順](docs/DEVICE_CONNECTION.md#5-複数のcodexチャットを監視する)を参照してください。
 チャット質問連携はCodex Appの`request_user_input_async`が対象で、自由記述・同期型`request_user_input`・ツール実行承認はPCで扱います。
 ローカル履歴とApp Toolsの形式に依存し、2026-10-26時点ではCodex App 26.1021.3705.0で実機往復を確認しています。
 異なる版で動かない場合は互換性の未確認として切り分け、成功したことにしないでください。
@@ -289,7 +299,7 @@ simulation/adapter.mjs  ── sessions / state / ack ──▶ C++ CompactUi (W
 SPP／USBともID付きackと8秒の接続期限を使用します。
 `scripts/device_bridge.cjs`が既存Codexブリッジの状態・回答を新画面へ接続し、切断時には再同期します。
 USB実機で表示・自動スクロール・A/B/C操作・回答の往復を確認済みです。
-現在のPCブリッジは選択した1セッションを配信します。実セッション一覧の自動収集と、長時間利用時の電池寿命は未対応・未確認です。
+PCブリッジは設定した監視範囲から最大16セッションを配信します。長時間利用時の電池寿命は未確認です。
 初代StickC、StickC Plusの実機互換は保証しません。
 
 ## 開発時の検証
@@ -299,6 +309,7 @@ node --test tests/ui.test.mjs
 node --test tests/device_bridge.test.cjs
 node --test tests/simulator_feed.test.cjs
 node --test tests/chat_questions.test.cjs
+node --test tests/multi_session.test.cjs
 python -m unittest discover -s tests -p 'test_*.py' -v
 # Emscripten有効時の通信部品テスト（生成先は.cache内）
 em++ -std=c++17 -Ifirmware/stickc-plus2/include tests/device_link.cpp -sSINGLE_FILE=1 -sENVIRONMENT=node -sEXIT_RUNTIME=1 -o .cache/device-link-test.cjs
