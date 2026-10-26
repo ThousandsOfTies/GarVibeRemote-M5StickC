@@ -27,7 +27,7 @@ def source_hash():
     digest=hashlib.sha256()
     files=[APP/'src'/name for name in ('codexBridge.ts','codexInteraction.ts','codexChatQuestions.ts','codexSessions.ts','codexStatus.ts','protocol.ts')]
     files+=[ROOT/'config/connection-node/package-lock.json']
-    files+=[ROOT/'scripts/device_bridge.cjs',ROOT/'scripts/simulator_feed.cjs']
+    files+=[ROOT/'scripts'/name for name in ('device_bridge.cjs','device_protocol.cjs','simulator_feed.cjs','pc_config.cjs')]
     for path in files:digest.update(path.name.encode());digest.update(path.read_bytes())
     return digest.hexdigest()
 
@@ -59,11 +59,12 @@ def prepare_dependencies():
         marker.write_text(DEPENDENCY_HASH+'\n',encoding='utf-8')
     build=("require(process.argv[1]).buildSync({entryPoints:[process.argv[2]],outfile:process.argv[3],"
            "nodePaths:[process.argv[4]],alias:{ws:process.argv[4]+'/ws'},bundle:true,"
-           "platform:'node',format:'cjs',target:'node24',logLevel:'info'})")
-    run([node,'-e',build,RUNTIME/'node_modules/esbuild',APP/'src/codexBridge.ts',RUNTIME/'codexBridge.cjs',RUNTIME/'node_modules'])
-    device_build=build.replace("bundle:true,","bundle:true,external:['serialport'],")
-    run([node,'-e',device_build,RUNTIME/'node_modules/esbuild',ROOT/'scripts/device_bridge.cjs',RUNTIME/'deviceBridge.cjs',RUNTIME/'node_modules'])
-    run([node,'-e',device_build,RUNTIME/'node_modules/esbuild',ROOT/'scripts/simulator_feed.cjs',RUNTIME/'simulatorFeed.cjs',RUNTIME/'node_modules'])
+           "external:JSON.parse(process.argv[5]),platform:'node',format:'cjs',target:'node24',logLevel:'info'})")
+    entries=((APP/'src/codexBridge.ts','codexBridge.cjs',[]),
+             (ROOT/'scripts/device_bridge.cjs','deviceBridge.cjs',['serialport']),
+             (ROOT/'scripts/simulator_feed.cjs','simulatorFeed.cjs',[]))
+    for source, output, external in entries:
+        run([node,'-e',build,RUNTIME/'node_modules/esbuild',source,RUNTIME/output,RUNTIME/'node_modules',json.dumps(external)])
     (RUNTIME/'build.json').write_text(json.dumps({'sourceHash':source_hash()})+'\n',encoding='utf-8')
 
 def classify_ports(items):

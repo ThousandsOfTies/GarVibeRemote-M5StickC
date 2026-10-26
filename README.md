@@ -303,6 +303,25 @@ USB実機で表示・自動スクロール・A/B/C操作・回答の往復を確
 PCブリッジは設定した監視範囲から最大16セッションを配信します。長時間利用時の電池寿命は未確認です。
 初代StickC、StickC Plusの実機互換は保証しません。
 
+## 開発時のPC側コード構成
+
+| ファイル（`scripts/`） | 役割 |
+| --- | --- |
+| `setup_remote.py` / `remote_config.py` | 起動コマンド・依存の準備／設定ファイル・Hookの編集 |
+| `pc_config.cjs` | Nodeの各起動コマンドで共通の設定検証 |
+| `chat_questions.cjs` | 単一チャット／複数チャットの起動先を選ぶ入口 |
+| `session_monitor.cjs` | チャット一覧と状態の収集・各チャットの質問処理の管理 |
+| `native_question_log.cjs` | ローカル履歴の読み取り・質問と回答済みの判定。通信は行わない |
+| `question_service.cjs` | 1チャット分の質問配信・実機回答の受信・送信記録 |
+| `codex_app_client.cjs` | Codex Appへの接続と、元のチャット・質問への回答 |
+| `device_protocol.cjs` | JSON Linesの読み取りと表示形式への変換。実機とWeb配信で共有 |
+| `device_bridge.cjs` | USB／SPPとPCブリッジの中継 |
+| `simulator_feed.cjs` | ブラウザへの閲覧専用配信。実機の中継には依存しない |
+
+履歴解析、通信、CLIの起動は別のモジュールです。サービスからCLIを読み戻す循環参照を作らず、
+画面・通信・設定を変更したときは、その責務を持つモジュールと検証を更新してください。
+従来の起動コマンドはそのまま使用できます。
+
 ## 開発時の検証
 
 ```powershell
@@ -311,6 +330,7 @@ node --test tests/device_bridge.test.cjs
 node --test tests/simulator_feed.test.cjs
 node --test tests/chat_questions.test.cjs
 node --test tests/multi_session.test.cjs
+node --test tests/pc_runtime.test.cjs
 python -m unittest discover -s tests -p 'test_*.py' -v
 # Emscripten有効時の通信部品テスト（生成先は.cache内）
 em++ -std=c++17 -Ifirmware/stickc-plus2/include tests/device_link.cpp -sSINGLE_FILE=1 -sENVIRONMENT=node -sEXIT_RUNTIME=1 -o .cache/device-link-test.cjs
@@ -323,6 +343,8 @@ python sources/gar-tools/web-simulator/serve.py --panel sources/gar-tools/web-si
 
 UI試験は実際のWASMとLVGL描画を使い、文字欠落、スクロール速度と位置保持、C／Aの選択と決定、
 セッション切替、キャンセル、切断、セッション別ack、独立インスタンスを確認します。
+PC側の試験は隔離した設定・仮の接続を使い、設定検証、起動失敗時の終了、送信直前の監視対象確認、
+履歴内のユーザー回答判定、実機とWeb配信の依存関係も確認します。
 部品単体例は縦・横の2台を独立して操作できます。Product adapterは部品のShadow DOMを参照しません。
 シミュレータ起動中に`http://127.0.0.1:8772/tests/index.html`を開くと、Productのボタン入力から
 模擬PCの受信確認までのブラウザ連携試験も実行できます。

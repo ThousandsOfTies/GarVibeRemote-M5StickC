@@ -28,14 +28,19 @@ scripts/session_monitor.cjs collects up to 16 local Codex chats across projects,
 one project or explicit ids, using App Tools. It keeps per-chat question workers,
 reply allowlists and delivery journals. Ordinary physical replies must retain
 session + native question + choice identities. No automatic task creation.
+scripts/pc_config.cjs owns Node entry-point configuration validation;
+remote_config.py validates Python setup reads and writes. device_protocol.cjs
+owns pure JSONL framing/state mapping and must not import device transports.
 BLE remains unimplemented. Do not confuse synthetic multi-session tests with
 two independent real chats answered on the physical device.
 scripts/simulator_feed.cjs is a separate read-only localhost WebSocket feed for
 the ?live=1 panel. Keep private tokens out of public assets, URLs and browsers;
 browser input must not become a real approval. Static serving stays separate.
-scripts/chat_questions.cjs separately mirrors local Codex App asynchronous
-choice cards and returns actual physical selections to that same card/chat through
-App Tools. See docs/DEVICE_CONNECTION.md. Do not synthesize human answers, forward
+scripts/chat_questions.cjs dispatches the single-chat or multi-session CLI.
+native_question_log.cjs parses local history without network access;
+question_service.cjs mirrors cards and delivers physical selections through
+codex_app_client.cjs. Services must not import their CLI dispatcher or start
+processes on import. See docs/DEVICE_CONNECTION.md. Do not synthesize human answers, forward
 tool approvals, replay uncertain deliveries or automate the Codex desktop UI.
 Keep roster order/membership stable at capacity; a background update must not
 reset another session's reading position or focused option. Use a stable display

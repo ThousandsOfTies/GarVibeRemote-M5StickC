@@ -203,3 +203,8 @@ python scripts/setup_remote.py simulator-feed
 `serial-open-failed`は発信COM番号・ペアリング・他の中継の使用状況を確認します。
 `device-busy`は別のUSB／SPP中継が操作中、`wrong-device`は機種またはファームウェアの不一致です。
 ログには接続トークンや質問本文を出しません。
+
+実装では、`device_protocol.cjs`が実機とWeb配信に共通する表示変換を担当し、
+USB／SPPの接続は`device_bridge.cjs`、閲覧用配信は`simulator_feed.cjs`へ分けています。
+質問は`native_question_log.cjs`で履歴を解析し、`question_service.cjs`でチャットごとに配信・回答を処理します。
+起動コマンドとモジュールごとの責務は[READMEのPC側コード構成](../README.md#開発時のpc側コード構成)を参照してください。

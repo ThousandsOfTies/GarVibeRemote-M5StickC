@@ -9,6 +9,7 @@ import secrets
 import shlex
 import subprocess
 import sys
+import unicodedata
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / 'sources/gar-vibe-ui/vibe-remote'
@@ -31,6 +32,17 @@ def read_config(path: Path) -> dict:
         config = json.loads(path.read_text(encoding='utf-8-sig'))
     except (OSError, ValueError):
         raise SetupError('接続設定を読み込めません。値を表示せず、設定ファイルを確認してください。') from None
+    return validate_config(config)
+
+
+def valid_session_ids(value) -> bool:
+    return (isinstance(value, list) and 1 <= len(value) <= 16 and
+            all(isinstance(s, str) and re.fullmatch(r'[A-Za-z0-9_-]{1,128}', s) for s in value) and
+            len(set(value)) == len(value))
+
+
+def validate_config(config: dict) -> dict:
+    """Use the same validation before reading, migrating or writing PC settings."""
     if not isinstance(config, dict):
         raise SetupError('接続設定の形式が不正です。')
     token, port, session = config.get('token'), config.get('port'), config.get('sessionId')
@@ -42,11 +54,16 @@ def read_config(path: Path) -> dict:
         raise SetupError('セッションIDの形式が不正です。')
     if config.get('sessionScope','single') not in ('single','project','local','manual'):
         raise SetupError('セッション監視範囲の形式が不正です。')
-    if config.get('sessionScope')=='manual' and (not isinstance(config.get('sessionIds'),list) or
-            not 1<=len(config['sessionIds'])<=16 or
-            any(not isinstance(s,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}',s) for s in config['sessionIds']) or
-            len(set(config['sessionIds']))!=len(config['sessionIds'])):
+    if config.get('sessionScope')=='manual' and not valid_session_ids(config.get('sessionIds')):
         raise SetupError('指定チャットは重複しないIDを1〜16個設定してください。')
+    if any(key in config and type(config[key]) is not bool for key in ('chatQuestions', 'watchInput')):
+        raise SetupError('質問連携と実行承認の設定はtrueかfalseで指定してください。')
+    if (config.get('sessionScope','single')!='single' or config.get('chatQuestions')) and not session:
+        raise SetupError('複数セッションの監視・質問連携には起動元チャットIDを指定してください。')
+    if config.get('sessionScope')=='project' and (not isinstance(config.get('codexCwd'),str) or not config['codexCwd'].strip()):
+        raise SetupError('プロジェクト監視には対象フォルダーを指定してください。')
+    if 'label' in config and (not isinstance(config['label'],str) or len(config['label'])>120 or any(unicodedata.category(c)=='Cc' for c in config['label'])):
+        raise SetupError('作業名は改行なしの120文字以内で指定してください。')
     return config
 
 def configure(path: Path, *, project: Path, session=None, label=None, port=None, import_config: Path | None=None, chat_questions=None, session_scope=None, session_ids=None) -> dict:
@@ -70,24 +87,10 @@ def configure(path: Path, *, project: Path, session=None, label=None, port=None,
     config['chatQuestionSources']=['m5stickc-plus2-spp','m5stickc-plus2-usb']
     config['sessionScope']=session_scope if session_scope is not None else previous.get('sessionScope','single')
     if session_ids is not None:config['sessionIds']=session_ids
-    if config['sessionScope'] not in ('single','project','local','manual'):
-        raise SetupError('セッション監視範囲はsingle・project・local・manualで指定してください。')
-    if config['sessionScope']!='single' and not config['sessionId']:
-        raise SetupError('複数セッションの監視には起動元チャットIDを指定してください。')
-    if config['sessionScope']=='manual' and (not isinstance(config.get('sessionIds'),list) or
-            not 1<=len(config['sessionIds'])<=16 or
-            any(not isinstance(s,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}',s) for s in config['sessionIds']) or
-            len(set(config['sessionIds']))!=len(config['sessionIds'])):
-        raise SetupError('指定チャットは重複しないIDを1〜16個設定してください。')
     for key in ('sppPort','sppBaudRate','firmware','firmwarePath','deviceTransport'):
         config.pop(key,None)
     config.setdefault('token',secrets.token_urlsafe(32))
-    if type(config['port']) is not int or not 1 <= config['port'] <= 65535:
-        raise SetupError('接続ポートは1〜65535で指定してください。')
-    if config['sessionId'] is not None and (not isinstance(config['sessionId'],str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}',config['sessionId'])):
-        raise SetupError('セッションIDの形式が不正です。')
-    if not isinstance(config['label'],str) or len(config['label'])>120 or any(ord(c)<32 for c in config['label']):
-        raise SetupError('作業名は改行なしの120文字以内で指定してください。')
+    validate_config(config)
     path.parent.mkdir(parents=True,exist_ok=True)
     path.write_text(json.dumps(config,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     if os.name!='nt':path.chmod(0o600)

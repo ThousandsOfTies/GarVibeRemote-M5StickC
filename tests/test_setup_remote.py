@@ -81,6 +81,24 @@ class SetupTests(unittest.TestCase):
             with self.assertRaises(settings.SetupError) as caught:settings.read_config(path)
             self.assertNotIn(secret,str(caught.exception))
 
+    def test_read_and_write_apply_the_same_config_contract(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);path=root/'private/config.json'
+            valid=settings.configure(path,project=root,session='chat-1')
+            saved=path.read_bytes()
+            for changes in ({'chatQuestions':'false'},{'watchInput':'true'},
+                            {'sessionScope':None},{'sessionScope':'project','codexCwd':''},
+                            {'chatQuestions':True,'sessionId':None},{'label':'bad\u007flabel'}):
+                with self.subTest(changes=changes):
+                    path.write_text(json.dumps({**valid,**changes}),encoding='utf-8')
+                    with self.assertRaises(settings.SetupError):settings.read_config(path)
+            path.write_bytes(saved)
+            for changes in ({'chat_questions':'false'},{'chat_questions':True,'session':''},
+                            {'label':'bad\u007flabel'}):
+                with self.subTest(changes=changes):
+                    with self.assertRaises(settings.SetupError):settings.configure(path,project=root,**changes)
+                    self.assertEqual(path.read_bytes(),saved)
+
     def test_public_directory_and_symlink_to_public_are_rejected(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);public=root/'public';public.mkdir()
