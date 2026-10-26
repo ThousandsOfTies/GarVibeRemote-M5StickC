@@ -173,6 +173,21 @@ test('authoritative snapshots preserve session identity through reordering and r
   assert.equal(a.state().sessions[a.state().listFocus].id,'s1');a.press('A');assert.equal(a.state().sessionId,'s1');
   a.receive(list(two));assert.equal(a.state().sessionId,'s2');assert.equal(a.action(),null);
 });
+test('live status or question updates do not cancel B/C/A session navigation',async()=>{
+  for(const transport of ['state','sessions'])for(const key of ['B','C','A']) {
+    const a=await app(),one=question('s1'),two=question('s2');a.receive(list(one,two));
+    if(key!=='B')a.press('B');
+    if(key==='A')a.press('C');
+    a.edge(key,1);a.tick(120);
+    const updated=structuredClone(one);updated.ui.id='new-question';updated.ui.message='状態が更新されました';
+    a.receive(transport==='state'?updated:list(updated,two));
+    a.edge(key,0);
+    if(key==='B')assert.equal(a.state().listOpen,true,transport+' open');
+    if(key==='C')assert.equal(a.state().sessions[a.state().listFocus].id,'s2',transport+' focus');
+    if(key==='A') {assert.equal(a.state().sessionId,'s2',transport+' select');assert.equal(a.state().listOpen,false);}
+    assert.equal(a.action(),null,'navigation never answers a question');
+  }
+});
 test('rejected response can be retried; waiting count reflects unanswered sessions',async()=>{
   const a=await app();a.receive(list(question('s1'),question('s2')));assert.equal(a.state().waitingCount,2);
   a.press('A');a.action();assert.equal(a.state().waitingCount,1);a.receive(ack('s1','q1','no',false));
