@@ -1,5 +1,9 @@
 # GarVibeRemote-M5StickC
 
+<p align="center">
+  <img src="docs/images/viberemote-cover.png" alt="VibeRemote — AIの進捗、手元でwわかる！" width="360">
+</p>
+
 PCから離れている間も、M5StickC Plus2でCodexの状態を確認し、チャットの選択式質問に回答するアプリです。
 **Cで選択、Aで決定、Bでセッション一覧**。複数のローカルCodexチャットを監視し、切り替えて回答できます。
 長い質問と選択肢は縦に自動スクロールします。
