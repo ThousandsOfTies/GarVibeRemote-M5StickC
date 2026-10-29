@@ -15,7 +15,7 @@ import urllib.error
 import urllib.request
 
 ROOT=Path(__file__).resolve().parents[1]
-APP=ROOT/'sources/gar-vibe-ui/vibe-remote'
+APP=ROOT/'sources/gar-vibe-remote/vibe-remote'
 CONFIG=ROOT/'artifacts/connection/local.json'
 DEPENDENCY_HASH=hashlib.sha256((ROOT/'config/connection-node/package-lock.json').read_bytes()).hexdigest()
 RUNTIME=ROOT/'.gar/connection-node'/DEPENDENCY_HASH[:16]

@@ -21,7 +21,7 @@ LCDは135×240、Aで決定、Bで一覧／戻る、C短押しで循環選択。
 | `src/main.cpp` | M5Unified・LVGL・USB／SPPの接続、ペアリングの通知とメインループ |
 | `include/DeviceLink.h` | JSON Linesの組み立て、USB／SPPの操作権、8秒の接続期限。ハードウェアAPIは持たない |
 | `include/PairingConsent.h` | 番号照合の確認・拒否・認証・30秒の期限。Bluetooth APIは持たない |
-| Productの`sources/gar-vibe-ui/vibe-remote/compact-ui/` | 画面描画・スクロール・セッション切替・A／B／C操作。実機とWASMで共通 |
+| Productの`sources/gar-vibe-remote/vibe-remote/compact-ui/` | 画面描画・スクロール・セッション切替・A／B／C操作。実機とWASMで共通 |
 | `scripts/shared_ui.py` | ビルド時に共有UI・フォント・LVGL設定を参照するためのパス設定 |
 
 この実機の描画・操作は共有UIへ、通信のフレーム処理と確認状態は独立した部品へ分けています。

@@ -41,7 +41,7 @@ USBケーブルの接続、ペアリングの番号照合、Hookのレビュー�
 | ケーブル | 給電だけでなく**データ通信に対応したUSBケーブル** |
 | PCのツール | Git、Python 3.10以上、Node.js 24以上とnpm、インターネット接続 |
 | 監視対象 | ローカルで動くCodex。チャットの選択式質問連携はCodex Appを使用 |
-| ソースの取得 | 本リポジトリと、公開submoduleの[gar-vibe-ui](https://github.com/ThousandsOfTies/gar-vibe-ui)、[gar-tools](https://github.com/ThousandsOfTies/gar-tools)をGitHubから取得できること |
+| ソースの取得 | 本リポジトリと、公開submoduleの[gar-vibe-remote](https://github.com/ThousandsOfTies/gar-vibe-remote)、[gar-tools](https://github.com/ThousandsOfTies/gar-tools)をGitHubから取得できること |
 
 共有ソースは公開submoduleです。`--recurse-submodules`で一緒に取得します。
 導入時にPlatformIOやVS Codeを別途セットアップする必要はありません。ファームウェアのビルドに必要なツールはスクリプトが専用環境へ準備します。
@@ -63,7 +63,7 @@ git submodule update --init --recursive
 ```
 
 submoduleはProductで固定したコミットを使い、導入のために`--remote`で更新しません。
-共有UIの変更は`gar-vibe-ui`の`main`へ統合しています。
+共有UIの変更は`gar-vibe-remote`の`main`へ統合しています。
 実機のビルド対象は本Productの`firmware/stickc-plus2/platformio.ini`です。
 最初に次を読みます。スキルをまだインストールしていなくても、リポジトリ内のファイルを直接読めます。
 
@@ -307,7 +307,7 @@ simulation/adapter.mjs  ── sessions / state / ack ──▶ C++ CompactUi (W
 ```
 
 - `sources/gar-tools/web-simulator/components/m5stickc-plus2.mjs`：再利用可能な筐体・LCD境界・物理ボタン。
-- `sources/gar-vibe-ui/vibe-remote/compact-ui/`：C++によるLVGL描画、自動スクロール、状態の優先度による自動選択、セッション一覧、回答の選択と決定。
+- `sources/gar-vibe-remote/vibe-remote/compact-ui/`：C++によるLVGL描画、自動スクロール、状態の優先度による自動選択、セッション一覧、回答の選択と決定。
 - `simulation/`：Product固有の文面・模擬PC・接続条件・画面構成。
 - `scripts/simulate.py`：共通HTTPサーバへの薄い入口。
 - `hardware/binding.json`：Plus2の画面・ボタン対応。
@@ -378,4 +378,4 @@ PC側の試験は隔離した設定・仮の接続を使い、設定検証、起
 著作権表示とライセンス文を残す条件で、使用・改変・再配布・商用利用を認めます。
 
 submoduleと依存ライブラリには、それぞれの利用条件が適用されます。本体のMITをそれらへ上書きしません。
-日本語フォントのデータは[SIL Open Font License 1.1](sources/gar-vibe-ui/vibe-remote/touch-ui/OFL.txt)です。
+日本語フォントのデータは[SIL Open Font License 1.1](sources/gar-vibe-remote/vibe-remote/touch-ui/OFL.txt)です。

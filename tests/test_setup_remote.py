@@ -127,7 +127,7 @@ class SetupTests(unittest.TestCase):
     def test_replacement_is_explicit_and_does_not_match_another_script_with_same_prefix(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);project=root/'project';project.mkdir();old=root/'old-product'
-            sender=old/'sources/gar-vibe-ui/vibe-remote/scripts/codex-hook.py';sender.parent.mkdir(parents=True);sender.write_text('# fixture')
+            sender=old/'sources/gar-vibe-remote/vibe-remote/scripts/codex-hook.py';sender.parent.mkdir(parents=True);sender.write_text('# fixture')
             config=root/'config.json';settings.configure(config,project=project)
             path=project/'.codex/hooks.json';path.parent.mkdir()
             original={'hooks':{'Stop':[{'hooks':[{'type':'command','command':f'python "{sender}" --config old'},

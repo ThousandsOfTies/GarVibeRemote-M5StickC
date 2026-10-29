@@ -56,7 +56,7 @@ def main():
     if not shutil.which('emcc'):
         parser.error('Activate Emscripten first, or use --wsl DISTRO on Windows. See README.md.')
     deps = dependencies()
-    app = ROOT / 'sources/gar-vibe-ui/vibe-remote/compact-ui'
+    app = ROOT / 'sources/gar-vibe-remote/vibe-remote/compact-ui'
     command = [sys.executable, str(ROOT / 'sources/gar-tools/web-simulator/build_lvgl.py'),
                '--lvgl', str(deps['lvgl']), '--json-library', str(deps['ArduinoJson']),
                '--app', str(app), '--config', str(app / 'lv_conf.h'),

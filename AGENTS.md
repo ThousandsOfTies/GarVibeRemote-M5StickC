@@ -10,7 +10,7 @@ Inventory the shared components before adding panel controls. Keep the visible
 StickC case, physical buttons and LCD boundary; this LCD has no touch input.
 
 Reusable parts belong to gar-tools Web Components. Actual screens and button
-logic belong to gar-vibe-ui/compact-ui C++/LVGL. Product scenarios, protocol
+logic belong to gar-vibe-remote/compact-ui C++/LVGL. Product scenarios, protocol
 mapping and connections belong to simulation/adapter.mjs. Never access shared
 component Shadow DOM from the Product adapter.
 

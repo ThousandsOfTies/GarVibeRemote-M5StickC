@@ -12,7 +12,7 @@ import sys
 import unicodedata
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = ROOT / 'sources/gar-vibe-ui/vibe-remote'
+APP = ROOT / 'sources/gar-vibe-remote/vibe-remote'
 PANEL = ROOT / 'simulation'
 EVENTS = ('SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PermissionRequest',
           'PostToolUse', 'Stop', 'Interrupt', 'SessionEnd')
@@ -129,7 +129,7 @@ def prepare_hooks(project: Path, config_path: Path, *, replace_product: Path | N
     original=copy.deepcopy(doc)
     senders=[sender]
     if replace_product:
-        legacy=replace_product.resolve()/'sources/gar-vibe-ui/vibe-remote/scripts/codex-hook.py'
+        legacy=replace_product.resolve()/'sources/gar-vibe-remote/vibe-remote/scripts/codex-hook.py'
         if not legacy.is_file():raise SetupError('置換元Productの送信スクリプトが見つかりません。')
         senders.append(legacy)
     args=[sys.executable,str(sender), '--config',str(config_path.resolve())]
