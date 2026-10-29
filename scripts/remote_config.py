@@ -127,11 +127,15 @@ def prepare_hooks(project: Path, config_path: Path, *, replace_product: Path | N
     if not isinstance(doc,dict) or not isinstance(doc.get('hooks',{}),dict):
         raise SetupError('既存のHook設定の形式が不正です。上書きしていません。')
     original=copy.deepcopy(doc)
-    senders=[sender]
+    # Only the explicit hooks command migrates this Product's former sender.
+    # Merely updating the repository must not change active hook definitions.
+    former=APP.parent.with_name('gar-vibe-ui')/'vibe-remote/scripts/codex-hook.py'
+    senders=[sender,former]
     if replace_product:
-        legacy=replace_product.resolve()/'sources/gar-vibe-remote/vibe-remote/scripts/codex-hook.py'
-        if not legacy.is_file():raise SetupError('置換元Productの送信スクリプトが見つかりません。')
-        senders.append(legacy)
+        legacy=[replace_product.resolve()/'sources'/name/'vibe-remote/scripts/codex-hook.py'
+                for name in ('gar-vibe-remote','gar-vibe-ui')]
+        if not any(path.is_file() for path in legacy):raise SetupError('置換元Productの送信スクリプトが見つかりません。')
+        senders.extend(legacy)
     args=[sys.executable,str(sender), '--config',str(config_path.resolve())]
     command=subprocess.list2cmdline(args) if os.name=='nt' else shlex.join(args)
     hooks=doc.setdefault('hooks',{})

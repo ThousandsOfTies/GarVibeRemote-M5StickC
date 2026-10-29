@@ -1,5 +1,7 @@
 # GarVibeRemote-M5StickC
 
+共通アプリの改名と既存環境の更新は、[リポジトリ名の移行手順](docs/REPOSITORY_RENAME.md)を参照してください。
+
 <p align="center">
   <img src="docs/images/viberemote-cover.png" alt="VibeRemote — AIの進捗、手元でwわかる！" width="360">
 </p>
