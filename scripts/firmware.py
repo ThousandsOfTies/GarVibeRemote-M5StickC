@@ -26,10 +26,22 @@ def environment():
                PLATFORMIO_LIBDEPS_DIR=str(cache/identity/'libs'))
     return env
 
-def toolchain():
+def ensure_python():
     if not PYTHON.is_file():venv.EnvBuilder(with_pip=True).create(PYTHON.parent.parent)
+
+
+def toolchain():
+    ensure_python()
     check=subprocess.run([str(PYTHON),'-c',"import platformio; assert platformio.__version__ == '6.1.19'"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     if check.returncode:subprocess.run([str(PYTHON),'-m','pip','install','platformio==6.1.19'],check=True)
+
+
+def serial_toolchain():
+    # GAR builds in Docker. Reading/backing up the board must not require a
+    # second firmware build on the Windows host merely to obtain esptool.
+    ensure_python()
+    check=subprocess.run([str(PYTHON),'-c',"import esptool; assert esptool.__version__ == '4.5.1'"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    if check.returncode:subprocess.run([str(PYTHON),'-m','pip','install','esptool==4.5.1'],check=True)
 
 def usb_port(port):
     ports,_=setup.serial_ports()
@@ -38,9 +50,8 @@ def usb_port(port):
     return port.upper() if os.name=='nt' else port
 
 def esptool(port,*args):
-    program=Path(environment()['PLATFORMIO_CORE_DIR'])/'packages/tool-esptoolpy/esptool.py'
-    if not program.is_file():raise RuntimeError('先にfirmware.py buildを実行してください。')
-    return [str(PYTHON),str(program),'--chip','esp32','--port',port,'--baud','921600',*map(str,args)]
+    serial_toolchain()
+    return [str(PYTHON),'-m','esptool','--chip','esp32','--port',port,'--baud','921600',*map(str,args)]
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)

@@ -30,8 +30,12 @@ LCDは135×240、Aで決定、Bで一覧／戻る、C短押しで循環選択。
 
 ## 書き込み
 
+GARを使う場合は[GAR導入手順](../../docs/GAR.md)に沿って、`gar target build`で成果物を保存し、
+`gar target deploy`でその成果物を実機へ書き込みます。以下は従来のProduct専用コマンドです。
+
 Productルートで実行します。Pythonとインターネット接続が必要です。
 ツールは`.gar/firmware-tools`と`~/.cache/gar-stickc`に隔離し、既存のPlatformIO設定と分離します。
+`identify`／`backup`は必要時に固定版esptoolを準備するため、GARでビルド済みならホスト側で再ビルドする必要はありません。
 
 ```powershell
 python scripts/firmware.py build

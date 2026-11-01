@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import createUi from '../simulation/runtime/lvgl-ui.mjs';
-const wasmBinary = await readFile(new URL('../simulation/runtime/lvgl-ui.wasm',import.meta.url));
+import createUi from '../simulation/ui-runtime/lvgl-ui.mjs';
+const wasmBinary = await readFile(new URL('../simulation/ui-runtime/lvgl-ui.wasm',import.meta.url));
 async function app() {
   const m=await createUi({wasmBinary});m._gar_lv_init();m._gar_app_init();
   const read=name=>{const p=m[`_gar_app_${name}`]();const v=m.UTF8ToString(p);return v?JSON.parse(v):null;};

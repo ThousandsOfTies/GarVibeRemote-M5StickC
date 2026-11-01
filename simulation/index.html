@@ -4,9 +4,9 @@
 <title>VibeRemote · M5StickC Plus2</title><link rel="stylesheet" href="./style.css"></head>
 <body>
 <main>
-  <header><h1>M5StickC シミュレータ <span class="model">Plus2</span></h1><p id="intro">本体のボタンで、状態確認とYES／NOを試せます。</p></header>
+  <header><h1>M5StickC シミュレータ <span class="model">Plus2</span></h1><p id="intro">実機と共通のアプリ本体をPCで動かし、ボタンと通信を試せます。</p></header>
   <section class="workbench" aria-label="M5StickC Plus2 simulator">
-    <div class="bench-top"><span><i></i><span id="mode-label">ローカル試験</span></span><span>135 × 240 · 縦画面</span></div>
+    <div class="bench-top"><span><i></i><span id="mode-label">PCアプリ · 模擬通信試験</span></span><span>135 × 240 · 縦画面</span></div>
     <div class="device-space"><gar-stickc-plus2 id="device" orientation="portrait" powered="true" label="VibeRemote M5StickC Plus2"><canvas slot="display" id="screen" width="135" height="240" inert aria-label="VibeRemote screen"></canvas></gar-stickc-plus2></div>
     <div class="guide"><span><kbd>A</kbd><b id="a-guide">決定</b></span><span><kbd>B</kbd><b>セッション一覧 / 戻る</b></span><span><kbd>C</kbd><b>次の項目へ</b></span></div>
     <p class="note">本体のボタンをクリック。フォーカス中は A・B・C キーでも操作できます。液晶はタッチ非対応です。</p>
@@ -20,10 +20,10 @@
       <gar-sim-controls id="scenarios"></gar-sim-controls>
       <p class="note">入力待ち・エラー・実行中・待機の順に自動切替します。操作中は表示を固定。Cで回答を選び、Aで決定、Bで一覧を開きます。本文は自動スクロールします。</p>
     </section>
-    <section class="card result" aria-live="polite"><div class="section-label">ROUND TRIP</div><h2 id="result-heading">回答の受信結果</h2><p id="answer">まだ回答していません</p><p class="note" id="answer-note">このページ内の模擬PCで受信・応答します。実際のCodexやBLEには接続していません。</p></section>
+    <section class="card result" aria-live="polite"><div class="section-label">ROUND TRIP</div><h2 id="result-heading">回答の受信結果</h2><p id="answer">PCアプリへの接続を待っています</p><p class="note" id="answer-note">模擬PCとアプリ本体が、実機と同じJSONLで送受信します。回答は試験専用です。</p></section>
   </aside>
   <details class="diagnostics"><summary>画面の状態とイベント</summary><pre id="snapshot"></pre><gar-event-log id="log" max-entries="60" label="イベント" clear-label="消去" empty-label="イベントはありません"></gar-event-log></details>
-  <footer><span>M5StickC Plus2 / LVGL 7</span><span>同じ C++ の描画・入力処理を WASM で実行</span></footer>
+  <footer><span>M5StickC Plus2 / LVGL 7</span><span>共通 C++ アプリを Node + WASM で実行 · VM不要</span></footer>
 </main>
 <script type="module" src="./adapter.mjs"></script>
 </body></html>

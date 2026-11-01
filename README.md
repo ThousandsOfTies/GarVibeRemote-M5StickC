@@ -12,6 +12,10 @@ PCから離れている間も、M5StickC Plus2でCodexの状態を確認し、�
 通常の導入は、以下の実機向け手順を使ってください。**シミュレータの起動、Emscripten、WSLは不要です。**
 開発用Webシミュレータは[後半](#開発者向けwebシミュレータ)に分けています。
 
+GARを使う場合は、[GARでPlus2へ導入する手順](docs/GAR.md)に沿って
+`gar target build` → `gar target deploy`でビルド・書き込みができます。
+GARは保存した成果物を検証して書き込みます。Codex監視・Bluetooth中継の準備は、以下のPC側の手順を使います。
+
 ## AIに導入を頼む
 
 ローカルのファイルと端末を操作できるAIへ、このリポジトリのREADMEを渡し、次のように依頼してください。
@@ -243,28 +247,32 @@ BLE、Copilot／Claudeなど他クライアント専用の連携、長時間利�
 ## 開発者向け：Webシミュレータ
 
 ここからは開発・UI確認用です。通常の実機導入では省略します。
-Python 3.10以上、Node.js 24以上、Emscriptenが必要です。共有リポジトリもsubmoduleとして取得します。
+実機と共通のC++アプリ本体（UI・JSONL受信・通信の所有権・ペアリング処理）を、
+PC上のNode + WASMで動かします。WebPanelは描画結果を表示し、物理ボタン相当の入力を送ります。
+VMは不要です。GARのビルド環境はDocker、実行環境はPCのNode.js 24以上です。
+初回ビルド時に固定版Emscriptenを専用キャッシュへ取得します。
 
 ```powershell
-git clone --recurse-submodules https://github.com/ThousandsOfTies/GarVibeRemote-M5StickC.git
-cd GarVibeRemote-M5StickC
-# Emscriptenを有効にした環境で一度ビルド
-python scripts/build.py
-# WSLにEmscriptenを用意してあるWindowsでは代わりに:
-# python scripts/build.py --wsl Ubuntu-26.04
-python scripts/simulate.py --port 8772
+# GARにProductを登録し、SimulationEnvironmentをhost_processにする
+gar config
+gar sim build --workspace Local/GarVibeRemote-M5StickC
+gar sim deploy --workspace Local/GarVibeRemote-M5StickC
+gar sim start --workspace Local/GarVibeRemote-M5StickC
+gar sim diag --workspace Local/GarVibeRemote-M5StickC --json
+# 終了するとき:
+gar sim stop --workspace Local/GarVibeRemote-M5StickC
 ```
 
-[シミュレータを開く](http://127.0.0.1:8772/)。UIソース変更後は再ビルドしてページを再読み込みします。
+[シミュレータを開く](http://127.0.0.1:8772/)。変更後は停止し、build → deploy → startを実行してページを再読み込みします。
 実機と同じCodexの本番状態を表示する場合は、別端末で`python scripts/setup_remote.py simulator-feed`を起動し、
 [本番表示](http://127.0.0.1:8772/?live=1)を開きます。閲覧専用で、回答は実機から行います。
 接続トークンはPC内の中継だけで使います。試験データの画面は通常のURLで引き続き使用できます。
 依存ライブラリは`dependencies.json`のバージョン・SHA256で検証して取得し、`.cache`へ保存します。
 生成WASMは`simulation/runtime`に置き、Gitには含めません。
 
-Emscriptenの新規導入は[公式手順](https://emscripten.org/docs/getting_started/downloads.html)を参照してください。
-`--wsl`はそのWSLのPATH、または`~/.cache/gar-ui/emsdk/emsdk_env.sh`を使用します。
-HTTPサーバは静的ファイルの配信だけを行います。Hookの変更や中継の起動は行いません。
+構成、再現範囲、試験APIは[シミュレータ開発ガイド](docs/SIMULATION.md)を参照してください。
+起動・停止はGAR、HTTP入出力と模擬PCはProduct、実機接続とHook設定は既存の導入手順が担当します。
+シミュレータを起動しても、実機や監視サービスの設定は変更しません。
 
 ## 操作
 
@@ -300,16 +308,22 @@ Cは2秒以上押して離すと電源ON、6秒以上でOFFも試せます。実
 ## 開発時のUI構成と責務
 
 ```text
-simulation/adapter.mjs  ── sessions / state / ack ──▶ C++ CompactUi (WASM / LVGL 7)
-    模擬PC・シナリオ    ◀──── uiAction ──────────      │ 135×240 pixels
-              ▲                             ▼
-              └──── 物理ボタンedge ── <gar-stickc-plus2> + canvas
+WebPanel: <gar-stickc-plus2> + canvas
+        │ ボタンedge / HTTP       ▲ RGBA framebuffer / HTTP
+        ▼                        │
+Node: host-server.cjs ── C++ DeviceApplication (WASM / LVGL 7)
+        模擬PC        ⇄ JSONL ⇄     │
+                                    └─ 実機も同じDeviceApplicationを使用
 ```
 
 - `sources/gar-tools/web-simulator/components/m5stickc-plus2.mjs`：再利用可能な筐体・LCD境界・物理ボタン。
 - `sources/gar-vibe-ui/vibe-remote/compact-ui/`：C++によるLVGL描画、自動スクロール、状態の優先度による自動選択、セッション一覧、回答の選択と決定。
-- `simulation/`：Product固有の文面・模擬PC・接続条件・画面構成。
-- `scripts/simulate.py`：共通HTTPサーバへの薄い入口。
+- `firmware/stickc-plus2/src/DeviceApplication.cpp`：実機・PC共通のJSONL受信、所有権、接続期限、ペアリング、UI・回答連携。
+- `firmware/stickc-plus2/src/main.cpp`：実機のM5・USB・SPP・LCDへの接続。
+- `simulation/host-entry.cpp`：共通アプリとPC実行環境をつなぐバイト列・時間・ボタン・描画のAPI。
+- `simulation/host-server.cjs` / `host-controller.cjs`：HTTP入出力とProduct固有の模擬PC・シナリオ。
+- `simulation/adapter.mjs`：Web Componentsの公開イベントをHTTPへ渡し、描画結果を表示する薄い接続。
+- `scripts/product-sim-build.sh`：GARのSIM_APPビルドhook。配布するモジュールとWebPanelをまとめる。
 - `hardware/binding.json`：Plus2の画面・ボタン対応。
 
 入力は既存VibeRemoteの`state`形式と、全件を渡す`sessions`形式です。
@@ -344,6 +358,8 @@ PCブリッジは設定した監視範囲から最大16セッションを配信�
 ## 開発時の検証
 
 ```powershell
+node --test tests/device_application.test.mjs tests/host_simulator.test.cjs
+# sim buildが別途生成するUI単体試験用モジュール（配布成果物には含めない）
 node --test tests/ui.test.mjs
 node --test tests/device_bridge.test.cjs
 node --test tests/simulator_feed.test.cjs
@@ -366,8 +382,8 @@ UI試験は実際のWASMとLVGL描画を使い、文字欠落、スクロール�
 PC側の試験は隔離した設定・仮の接続を使い、設定検証、起動失敗時の終了、送信直前の監視対象確認、
 履歴内のユーザー回答判定、実機とWeb配信の依存関係も確認します。
 部品単体例は縦・横の2台を独立して操作できます。Product adapterは部品のShadow DOMを参照しません。
-シミュレータ起動中に`http://127.0.0.1:8772/tests/index.html`を開くと、Productのボタン入力から
-模擬PCの受信確認までのブラウザ連携試験も実行できます。
+共通アプリの試験では、実際のWASMへ分割バイト列を送り、USB／SPPの所有権・接続期限・
+ペアリング・回答の宛先を確認します。HTTP試験ではプロセスのbuild IDと実際の画素も照合します。
 
 ハードウェア参照：[M5Stack公式 StickC Plus2](https://docs.m5stack.com/en/core/StickC-Plus2)。
 共通ソースはsubmoduleです。変更時は共有リポジトリを先にコミット・プッシュし、そのコミットをこのProductで固定します。
