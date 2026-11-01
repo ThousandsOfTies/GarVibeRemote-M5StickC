@@ -62,7 +62,7 @@ USBケーブルの接続、ペアリングの番号照合、Hookのレビュー�
 | ケーブル | 給電だけでなく**データ通信に対応したUSBケーブル** |
 | PCのツール | Git、Python 3.10以上、Node.js 24以上とnpm、インターネット接続 |
 | 監視対象 | ローカルで動くCodex。チャットの選択式質問連携はCodex Appを使用 |
-| ソースの取得 | 本リポジトリと、公開submoduleの[gar-vibe-remote](https://github.com/ThousandsOfTies/gar-vibe-remote)、[gar-tools](https://github.com/ThousandsOfTies/gar-tools)をGitHubから取得できること |
+| ソースの取得 | 本リポジトリと、公開submoduleの[gar-vibe-remote](https://github.com/ThousandsOfTies/gar-vibe-remote)、[gar-tools](https://github.com/ThousandsOfTies/gar-tools)、[gar-board-m5stickc-plus2](https://github.com/ThousandsOfTies/gar-board-m5stickc-plus2)をGitHubから取得できること |
 
 共有ソースは公開submoduleです。`--recurse-submodules`で一緒に取得します。
 導入時にPlatformIOやVS Codeを別途セットアップする必要はありません。ファームウェアのビルドに必要なツールはスクリプトが専用環境へ準備します。
