@@ -22,6 +22,11 @@ BLE is not implemented. Read section 5 of docs/DEVICE_CONNECTION.md for limits.
 Do not flash the old shared M5StickC client as this portrait UI.
 
 For an explicit installation request, read `firmware/stickc-plus2/README.md`.
+When the user chooses GAR, read `docs/GAR.md`: use the Product build hook through
+`gar target build`, then `gar target deploy` to flash the saved TARGET_APP snapshot
+without rebuilding. GAR deploy does not configure Codex, hooks or the SPP relay;
+continue the PC setup steps separately. Keep its Linux build cache separate from
+host tools. ESP32 status/preflight/diag are not implemented by this GAR backend.
 Confirm the model is Plus2, using existing user confirmation when available;
 a CH9102 USB port alone does not identify the model. Use `scripts/firmware.py`
 to build, identify the USB device, save an 8MB flash backup and flash it.

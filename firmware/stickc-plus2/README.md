@@ -9,7 +9,8 @@ LCDは135×240、Aで決定、Bで一覧／戻る、C短押しで循環選択。
 セッションは入力待ち・エラー・実行中・待機の順に自動選択します。回答や一覧の操作中は固定し、
 回答の受信確認後に再開します。同じ優先度は表示を維持します。手動で開いた状態画面は10秒間保持します。
 本体のC（GPIO35）はM5Unified上では`BtnPWR`として取得します。`BtnC`は使用しません。
-実機用wrapperはこのProduct内に置き、共有AppからはCompactUiを組み込みます。
+基板I/Oは独立した`board-m5stickc-plus2`、通信・確認処理とCompactUiは`gar-vibe-remote`から組み込みます。
+Productの`main.cpp`はその接続だけを持ちます。[構成の詳細](../../docs/COMPOSITION.md)も参照してください。
 
 対象は**M5StickC Plus2のみ**です。USBシリアル機器の型番では本体を識別できません。
 初代StickC／Plus／T-Watch用に、この環境を書き込まないでください。
@@ -18,20 +19,32 @@ LCDは135×240、Aで決定、Bで一覧／戻る、C短押しで循環選択。
 
 | ファイル | 責務 |
 | --- | --- |
-| `src/main.cpp` | M5Unified・LVGL・USB／SPPの接続、ペアリングの通知とメインループ |
-| `include/DeviceLink.h` | JSON Linesの組み立て、USB／SPPの操作権、8秒の接続期限。ハードウェアAPIは持たない |
-| `include/PairingConsent.h` | 番号照合の確認・拒否・認証・30秒の期限。Bluetooth APIは持たない |
+| `src/main.cpp` | 基板I/Oと共通アプリのcallback接続 |
+| Productの`sources/board-m5stickc-plus2/arduino/` | M5Unified・LVGL・USB/SPP・ボタン・電池・時計とBluetooth callback |
+| Productの`sources/gar-vibe-remote/vibe-remote/device-app/DeviceApplication.cpp` | 実機・PC共通の受信、所有権、ペアリング確認、UI連携と回答 |
+| Productの`sources/gar-vibe-remote/vibe-remote/device-app/DeviceLink.h` | JSON Linesの組み立て、USB／SPPの操作権、8秒の接続期限。ハードウェアAPIは持たない |
+| Productの`sources/gar-vibe-remote/vibe-remote/device-app/PairingConsent.h` | 番号照合の確認・拒否・認証・30秒の期限。Bluetooth APIは持たない |
 | Productの`sources/gar-vibe-remote/vibe-remote/compact-ui/` | 画面描画・スクロール・セッション切替・A／B／C操作。実機とWASMで共通 |
 | `scripts/shared_ui.py` | ビルド時に共有UI・フォント・LVGL設定を参照するためのパス設定 |
 
 この実機の描画・操作は共有UIへ、通信のフレーム処理と確認状態は独立した部品へ分けています。
 旧Wi-Fiクライアントは削除し、実機ファームウェアはこのUSB／SPP版に一本化しています。
-実機を更新せずに部品を検証する場合は、Productの`tests/device_link.cpp`と`tests/ui.test.mjs`を使います。
+実機を更新せずに部品を検証する場合は、共通アプリの`tests/device_link.cpp`と`tests/ui.test.mjs`を使います。
+
+## ビルド設定の生成
+
+通常のビルドコマンドは、`product.json`と基板プロファイルから自動で設定を生成します。
+PlatformIOを直接実行する場合は、先にProductルートで`python tools/product.py prepare`を実行してください。
+`.gar/composition/board.ini`とOS別ヘッダーは生成物です。端子番号や基板設定を手で追加しません。
 
 ## 書き込み
 
+GARを使う場合は[GAR導入手順](../../docs/GAR.md)に沿って、`gar target build`で成果物を保存し、
+`gar target deploy`でその成果物を実機へ書き込みます。以下は従来のProduct専用コマンドです。
+
 Productルートで実行します。Pythonとインターネット接続が必要です。
 ツールは`.gar/firmware-tools`と`~/.cache/gar-stickc`に隔離し、既存のPlatformIO設定と分離します。
+`identify`／`backup`は必要時に固定版esptoolを準備するため、GARでビルド済みならホスト側で再ビルドする必要はありません。
 
 ```powershell
 python scripts/firmware.py build

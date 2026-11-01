@@ -1,5 +1,6 @@
 .cache/
 simulation/runtime/
+simulation/ui-runtime/
 artifacts/
 __pycache__/
 *.pyc
