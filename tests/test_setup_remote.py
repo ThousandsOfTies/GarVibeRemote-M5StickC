@@ -127,7 +127,7 @@ class SetupTests(unittest.TestCase):
     def test_replacement_is_explicit_and_does_not_match_another_script_with_same_prefix(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);project=root/'project';project.mkdir();old=root/'old-product'
-            sender=old/'sources/gar-vibe-ui/vibe-remote/scripts/codex-hook.py';sender.parent.mkdir(parents=True);sender.write_text('# fixture')
+            sender=old/'sources/gar-vibe-remote/vibe-remote/scripts/codex-hook.py';sender.parent.mkdir(parents=True);sender.write_text('# fixture')
             config=root/'config.json';settings.configure(config,project=project)
             path=project/'.codex/hooks.json';path.parent.mkdir()
             original={'hooks':{'Stop':[{'hooks':[{'type':'command','command':f'python "{sender}" --config old'},
@@ -138,6 +138,22 @@ class SetupTests(unittest.TestCase):
             with patch.object(settings,'ROOT',root):settings.prepare_hooks(project,config,replace_product=old)
             doc=json.loads(path.read_text());commands=[h['command'] for g in doc['hooks']['Stop'] for h in g['hooks']]
             self.assertFalse(any(' --config old' in c for c in commands));self.assertTrue(any('.other' in c for c in commands))
+
+    def test_explicit_hooks_command_migrates_the_former_repository_path_only(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);config=root/'private.json'
+            settings.configure(config,project=root)
+            former=settings.APP.parent.with_name('gar-vibe-ui')/'vibe-remote/scripts/codex-hook.py'
+            path=root/'.codex/hooks.json';path.parent.mkdir()
+            path.write_text(json.dumps({'hooks':{'Stop':[{'hooks':[
+                {'type':'command','command':f'python "{former}" --config old'},
+                {'type':'command','command':f'python "{former}.other"'},
+            ]}]}}),encoding='utf-8')
+            with patch.object(settings,'ROOT',root):settings.prepare_hooks(root,config)
+            commands=[hook['command'] for group in json.loads(path.read_text(encoding='utf-8'))['hooks']['Stop'] for hook in group['hooks']]
+            self.assertFalse(any(' --config old' in command for command in commands))
+            self.assertTrue(any('.other' in command for command in commands))
+            self.assertEqual(sum(settings.owns_command(command,settings.APP/'scripts/codex-hook.py') for command in commands),1)
 
     def test_bad_hook_file_or_interactive_setting_cannot_overwrite_existing_hooks(self):
         with tempfile.TemporaryDirectory() as folder:

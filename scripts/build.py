@@ -109,7 +109,7 @@ def main():
     if not shutil.which('emcc', path=env.get('PATH')):
         parser.error('Activate Emscripten first, or use --wsl DISTRO on Windows. See README.md.')
     deps = dependencies()
-    app = ROOT / 'sources/gar-vibe-ui/vibe-remote/compact-ui'
+    app = ROOT / 'sources/gar-vibe-remote/vibe-remote/compact-ui'
     firmware = ROOT / 'firmware/stickc-plus2'
     output = args.output or ROOT / ('simulation/ui-runtime' if args.ui_only else 'simulation/runtime')
     config = firmware / 'include/stickc_lv_conf.h'
