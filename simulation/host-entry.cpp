@@ -1,27 +1,31 @@
 // Node host ABI. Initialize the generic display with gar_lv_init() first.
 // gar_app_tick() owns the clock; do not additionally call gar_lv_tick().
 #include "DeviceApplication.h"
+#include "application_config.h"
+#include "gar_board_config.h"
 #include <deque>
 
 namespace {
 std::deque<std::string> outgoing;
 std::string snapshot,result;
-stickc::DeviceApplication::Hardware facts;
-stickc::DeviceApplication app(
-  [](stickc::Transport link,const std::string& data) {
-    JsonDocument document;document["transport"]=stickc::name(link);document["data"]=data;
+vibe::DeviceApplication::Hardware facts;
+vibe::DeviceApplication app(
+  {gar_application::device,gar_application::firmware,gar_application::bluetooth_name,gar_application::source_prefix},
+  [](vibe::Transport link,const std::string& data) {
+    JsonDocument document;document["transport"]=vibe::name(link);document["data"]=data;
     std::string packet;serializeJson(document,packet);outgoing.push_back(std::move(packet));
   },
   [](bool accepted) {
     JsonDocument document;document["type"]="pairing-confirm";document["accepted"]=accepted;
     std::string packet;serializeJson(document,packet);outgoing.push_back(std::move(packet));
   });
-stickc::Transport transport(int link) {
-  return link==1?stickc::Transport::usb:link==2?stickc::Transport::spp:stickc::Transport::none;
+vibe::Transport transport(int link) {
+  return link==1?vibe::Transport::usb:link==2?vibe::Transport::spp:vibe::Transport::none;
 }
 }
 extern "C" {
 void gar_app_init() {
+  facts.width=gar_board::display::width;facts.height=gar_board::display::height;
   facts.battery=82;facts.sppReady=true;app.begin(facts);app.step();lv_task_handler();
 }
 void gar_app_tick(unsigned elapsed) {

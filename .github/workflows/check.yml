@@ -1,0 +1,40 @@
+name: Build composed Product
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  product:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .cache
+            .gar/target-build-tools
+          key: composed-product-${{ runner.os }}-${{ hashFiles('product.json', 'dependencies.json', 'sources/board-m5stickc-plus2/profiles/*.json') }}
+      - name: Validate component composition
+        run: python tools/product.py describe
+      - name: Prepare isolated PC test dependencies
+        run: python scripts/setup_remote.py prepare
+      - name: Check offline Product and artifact logic
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Build and verify the physical firmware bundle without flashing
+        run: python scripts/gar_target_artifact.py
+      - name: Build and verify the shared application simulator
+        run: python scripts/gar_sim_artifact.py
+      - name: Check application and PC adapter behavior
+        run: node --test tests/*.test.cjs tests/*.test.mjs
+      - name: Verify portable protocol independently
+        run: |
+          g++ -std=c++17 -Isources/gar-vibe-remote/vibe-remote/device-app sources/gar-vibe-remote/tests/device_link.cpp -o /tmp/device-link-test
+          /tmp/device-link-test

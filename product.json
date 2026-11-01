@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "garviberemote-m5stickc",
+  "components": {
+    "application": "sources/gar-vibe-remote",
+    "tools": "sources/gar-tools",
+    "board": "sources/board-m5stickc-plus2"
+  },
+  "board_profile": "arduino-esp32",
+  "hardware": {"binding": "hardware/binding.json"},
+  "application": {
+    "device": "m5stickc-plus2",
+    "firmware": "gar-stickc-spp-v1",
+    "bluetooth_name": "GarVibe-M5StickC-Plus2",
+    "source_prefix": "m5stickc-plus2",
+    "rotation": 0,
+    "brightness": 96,
+    "lvgl_heap_bytes": 49152
+  },
+  "build": {
+    "backend": "platformio",
+    "project": "firmware/stickc-plus2",
+    "environment": "stickc-plus2-usb",
+    "sources": ["vibe-remote/device-app/DeviceApplication.cpp", "vibe-remote/compact-ui/CompactUi.cpp"],
+    "includes": ["vibe-remote/device-app", "vibe-remote/compact-ui", "vibe-remote/touch-ui"]
+  },
+  "launch": {"entrypoint": "firmware/stickc-plus2/src/main.cpp", "simulation": "simulation/host-server.cjs"}
+}

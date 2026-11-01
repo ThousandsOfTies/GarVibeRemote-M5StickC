@@ -18,6 +18,21 @@ GARを使う場合は、[GARでPlus2へ導入する手順](docs/GAR.md)に沿っ
 `gar target build` → `gar target deploy`でビルド・書き込みができます。
 GARは保存した成果物を検証して書き込みます。Codex監視・Bluetooth中継の準備は、以下のPC側の手順を使います。
 
+## アプリ・ツール・基板を組み合わせる構成
+
+構成の正本は[product.json](product.json)、詳細は[コンポジション](docs/COMPOSITION.md)です。
+この変更は`refactor/board-composition`ブランチにあります。
+
+| 役割 | submodule | 内容 |
+| --- | --- | --- |
+| アプリ | `sources/gar-vibe-remote` | 画面と実機／PC共通のDeviceApplication |
+| 共通ツール | `sources/gar-tools` | 構成検査・ビルド・シミュレータ部品 |
+| 基板 | `sources/board-m5stickc-plus2` | 内蔵部品の仕様・ドライバ依存・Arduino I/O |
+
+Productには、アプリの設定、使う部品名、基板I/Oとアプリの接続、PCのCodex連携、模擬シナリオを残します。
+GPIO番号や基板初期化を複製せず、実機とPCは同じアプリソースを使います。
+`python tools/product.py describe`で、選択した構成と固定コミットを確認できます。
+
 ## AIに導入を頼む
 
 ローカルのファイルと端末を操作できるAIへ、このリポジトリのREADMEを渡し、次のように依頼してください。
@@ -62,14 +77,14 @@ USBケーブルの接続、ペアリングの番号照合、Hookのレビュー�
 新規取得では次を使います。既存のcheckoutがある場合は、その作業内容を保持して再利用してください。
 
 ```powershell
-git clone --recurse-submodules https://github.com/ThousandsOfTies/GarVibeRemote-M5StickC.git
+git clone --branch refactor/board-composition --recurse-submodules https://github.com/ThousandsOfTies/GarVibeRemote-M5StickC.git
 cd GarVibeRemote-M5StickC
 # submoduleを取得していない既存checkoutの場合:
 git submodule update --init --recursive
 ```
 
 submoduleはProductで固定したコミットを使い、導入のために`--remote`で更新しません。
-共有UIの変更は`gar-vibe-remote`の`main`へ統合しています。
+共有UIと共通アプリはProductのsubmoduleで固定したコミットを使います。
 実機のビルド対象は本Productの`firmware/stickc-plus2/platformio.ini`です。
 最初に次を読みます。スキルをまだインストールしていなくても、リポジトリ内のファイルを直接読めます。
 
@@ -320,8 +335,9 @@ Node: host-server.cjs ── C++ DeviceApplication (WASM / LVGL 7)
 
 - `sources/gar-tools/web-simulator/components/m5stickc-plus2.mjs`：再利用可能な筐体・LCD境界・物理ボタン。
 - `sources/gar-vibe-remote/vibe-remote/compact-ui/`：C++によるLVGL描画、自動スクロール、状態の優先度による自動選択、セッション一覧、回答の選択と決定。
-- `firmware/stickc-plus2/src/DeviceApplication.cpp`：実機・PC共通のJSONL受信、所有権、接続期限、ペアリング、UI・回答連携。
-- `firmware/stickc-plus2/src/main.cpp`：実機のM5・USB・SPP・LCDへの接続。
+- `sources/gar-vibe-remote/vibe-remote/device-app/DeviceApplication.cpp`：実機・PC共通のJSONL受信、所有権、接続期限、ペアリング、UI・回答連携。
+- `sources/board-m5stickc-plus2/arduino/`：実機のM5・USB・SPP・LCD・時計のI/O。
+- `firmware/stickc-plus2/src/main.cpp`：基板I/Oと共通アプリのcallback接続。
 - `simulation/host-entry.cpp`：共通アプリとPC実行環境をつなぐバイト列・時間・ボタン・描画のAPI。
 - `simulation/host-server.cjs` / `host-controller.cjs`：HTTP入出力とProduct固有の模擬PC・シナリオ。
 - `simulation/adapter.mjs`：Web Componentsの公開イベントをHTTPへ渡し、描画結果を表示する薄い接続。
@@ -371,7 +387,7 @@ node --test tests/pc_runtime.test.cjs
 node --test tests/native_chat_reply.test.cjs
 python -m unittest discover -s tests -p 'test_*.py' -v
 # Emscripten有効時の通信部品テスト（生成先は.cache内）
-em++ -std=c++17 -Ifirmware/stickc-plus2/include tests/device_link.cpp -sSINGLE_FILE=1 -sENVIRONMENT=node -sEXIT_RUNTIME=1 -o .cache/device-link-test.cjs
+em++ -std=c++17 -Isources/gar-vibe-remote/vibe-remote/device-app sources/gar-vibe-remote/tests/device_link.cpp -sSINGLE_FILE=1 -sENVIRONMENT=node -sEXIT_RUNTIME=1 -o .cache/device-link-test.cjs
 node .cache/device-link-test.cjs
 # 共通部品の単体例（別ポートで起動）
 python sources/gar-tools/web-simulator/serve.py --panel sources/gar-tools/web-simulator/examples/stickc-parts --port 8773

@@ -6,6 +6,7 @@ import secrets
 import time
 import sys
 import serial
+from composition import product
 
 def encode(value):return (json.dumps(value,ensure_ascii=False)+'\n').encode('utf-8')
 
@@ -25,7 +26,8 @@ def main():
     parser.add_argument('--port',required=True);parser.add_argument('--duration',type=float,default=0)
     args=parser.parse_args();samples=examples();by_id={s['session']['id']:s for s in samples}
     if args.duration<0:parser.error('--duration must be zero or positive')
-    port=serial.Serial();port.port=args.port;port.baudrate=115200;port.timeout=.05;port.write_timeout=2
+    selected=product();display=selected.profile['resources']['display']
+    port=serial.Serial();port.port=args.port;port.baudrate=selected.profile['resources']['usb']['baud'];port.timeout=.05;port.write_timeout=2
     # Do not deliberately reset the board when opening a UI test session.
     port.dtr=False;port.rts=False
     started=time.monotonic();last_ping=0;last_snapshot=0;ready=False;last_view=None;buffer=bytearray()
@@ -47,7 +49,7 @@ def main():
                 if not isinstance(message,dict):continue
                 type=message.get('type')
                 if type=='deviceInfo':
-                    if message.get('device')!='m5stickc-plus2' or (message.get('width'),message.get('height'))!=(135,240):
+                    if message.get('device')!=selected.data['application']['device'] or (message.get('width'),message.get('height'))!=(display['width'],display['height']):
                         raise RuntimeError('Unexpected device or display dimensions')
                     if message.get('protocol')=='gar-compact-v1' and message.get('activeTransport')!='usb-serial':continue
                     print(json.dumps({'event':'device-ready',**message}),flush=True)

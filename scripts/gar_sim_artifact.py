@@ -13,11 +13,13 @@ import sys
 import tempfile
 
 from gar_target_artifact import BuildError, invalidate_output, require_plain_path, clean_output
+from composition import product
 
 ROOT = Path(__file__).resolve().parents[1]
 PANEL_FILES = ('index.html', 'adapter.mjs', 'style.css')
 SERVER_FILES = ('host-server.cjs', 'host-controller.cjs')
 RUNTIME_FILES = ('lvgl-ui.mjs', 'lvgl-ui.wasm', 'build.json')
+DISPLAY = product().profile['resources']['display']
 
 
 def publish_bundle():
@@ -28,8 +30,8 @@ def publish_bundle():
         if not source.is_file() or not source.stat().st_size:
             raise BuildError(f'Missing simulator input: {source}')
     runtime_metadata = json.loads((simulation / 'runtime/build.json').read_text(encoding='utf-8'))
-    if runtime_metadata.get('width') != 135 or runtime_metadata.get('height') != 240:
-        raise BuildError('Runtime display is not the Plus2 135x240 display.')
+    if any(runtime_metadata.get(key) != DISPLAY[key] for key in ('width', 'height')):
+        raise BuildError('Runtime display does not match the selected board profile.')
     if runtime_metadata.get('runtime') != 'shared-device-application' or not runtime_metadata.get('applicationSourceHash'):
         raise BuildError('Build the shared DeviceApplication runtime before packaging; a UI-only WASM is insufficient.')
     wasm = (simulation / 'runtime/lvgl-ui.wasm').read_bytes()

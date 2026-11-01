@@ -66,7 +66,10 @@ WebPanelはアプリの状態を独自に計算しません。シナリオも`he
 定期的な`ping`、回答後の`ack`をバイト通信路へ流します。
 共有部品は`sources/gar-tools/web-simulator/components/`、Productの意味と模擬PCは
 `simulation/host-controller.cjs`、HTTPは`host-server.cjs`、表示の接続は`adapter.mjs`です。
-実機の`main.cpp`はM5・USB・SPP・LCDへの接続を担当します。
+共通アプリは`sources/gar-vibe-remote/vibe-remote/device-app/`に置きます。
+実機のI/Oは独立した基板submodule、Productの`main.cpp`はそのcallback接続です。
+画面寸法は基板プロファイル、LVGLメモリ量と識別名は`product.json`から読みます。
+[コンポジション](COMPOSITION.md)に構成と生成物をまとめています。
 
 GARの汎用`host_process`はプロセスと成果物を管理し、VibeRemoteのメッセージを解釈しません。
 成果物の`host-process.json`に起動先・ポート・health URLを宣言します。

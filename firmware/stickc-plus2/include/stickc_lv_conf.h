@@ -1,6 +1,6 @@
 #pragma once
 #include "lv_conf.h"
-// The Web build has ample memory. The native ESP32 needs a smaller static
-// LVGL object heap; this UI uses only fixed labels and a few selection rows.
+#include "application_config.h"
+// Use the Product's same memory budget on firmware and the PC host.
 #undef LV_MEM_SIZE
-#define LV_MEM_SIZE (48U * 1024U)
+#define LV_MEM_SIZE GAR_APPLICATION_LVGL_HEAP_BYTES

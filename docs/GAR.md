@@ -4,6 +4,9 @@
 `host_process`を選択すると`gar sim build／deploy／start／stop／diag`を使用できます。
 以下は実機への書き込み手順です。
 
+ビルドは[Productのコンポジション](COMPOSITION.md)から基板設定・共通アプリを選びます。
+GAR hookが自動で`prepare`し、基板情報をProduct内へコピーしません。
+
 このProductは、GARの`gar target build`でファームウェアをビルドし、
 `gar target deploy`でM5StickC Plus2へ書き込めます。
 ここでいう実機へのインストールは、GARの標準操作である`target deploy`です。

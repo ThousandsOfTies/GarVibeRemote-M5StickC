@@ -10,7 +10,7 @@ Inventory the shared components before adding panel controls. Keep the visible
 StickC case, physical buttons and LCD boundary; this LCD has no touch input.
 
 Reusable parts belong to gar-tools Web Components. Actual screens and button
-logic belong to gar-vibe-remote/compact-ui C++/LVGL. DeviceApplication owns portable
+logic belong to gar-vibe-remote/compact-ui C++/LVGL. The shared gar-vibe-remote/device-app DeviceApplication owns portable
 protocol, ownership, pairing and UI integration for both firmware and PC. Product
 scenarios and the synthetic JSONL peer live in simulation/host-controller.cjs;
 simulation/adapter.mjs only wires public component events and HTTP pixels. Never access shared
@@ -78,3 +78,22 @@ Product setup. ESP32 preflight/status/diag do not prove model or app health.
 Porting setup code does not authorize rewriting active hooks or restarting the
 user's running services. The explicit hooks command preserves unrelated entries;
 only --replace-product removes the named old sender. Hook trust is a user action.
+
+
+# Product composition
+
+Read docs/COMPOSITION.md and product.json. Pin application, tools and board as
+independent submodules. The board owns its verified built-in resources, driver
+versions and Arduino hardware adapter; the shared application owns DeviceApplication,
+DeviceLink, PairingConsent and CompactUi. Do not copy them into firmware/.
+Product main.cpp connects callbacks; components.cpp includes the generated source
+list once. Product owns the application identity, display use/options, PC setup,
+Codex integration, scenarios and GAR artifact hooks.
+
+hardware/binding.json selects resource names only. Pin numbers and LCD dimensions
+belong to the board profile. Generate PlatformIO settings/constants with
+python tools/product.py prepare (normal build hooks do this automatically).
+Never hand-edit .gar/composition/ or add generated data to Git. Windows and Linux
+headers are separate so parallel builds do not mix absolute paths.
+Do not flash, restart a real relay, change enrollment or rewrite hooks as part
+of an offline composition refactor. Verify firmware and the shared-app simulator.

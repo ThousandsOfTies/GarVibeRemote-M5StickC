@@ -7,17 +7,18 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import platform
 import struct
 import subprocess
 import sys
 import tempfile
-import venv
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from composition import product
+from embedded import runtime_paths as composition_runtime_paths
 
 ROOT = Path(__file__).resolve().parents[1]
-PIO_VERSION = '6.1.19'
-PIO_ENV = 'stickc-plus2-usb'
-FLASH_SIZE = 0x800000
+PIO_VERSION = product().profile['platformio']['core_version']
+PIO_ENV = product().data['build']['environment']
+FLASH_SIZE = product().profile['flash']['size_bytes']
 FLASH_FILES = ('bootloader.bin', 'partitions.bin', 'boot_app0.bin', 'firmware.bin')
 
 
@@ -56,39 +57,17 @@ def invalidate_output():
 
 
 def runtime_paths():
-    tag = f'{sys.platform}-{platform.machine().lower()}-py{sys.version_info.major}.{sys.version_info.minor}'
-    shared_cache = os.environ.get('GAR_BUILD_CACHE')
-    if shared_cache:
-        base = Path(shared_cache)
-        if not base.is_absolute():
-            raise BuildError('GAR_BUILD_CACHE must be an absolute build-cache directory.')
-        runtime = base / 'target-build-tools' / f'{tag}-pio-{PIO_VERSION}'
-        cache = base / 'target-build' / tag
-    else:
-        runtime = ROOT / '.gar/target-build-tools' / f'{tag}-pio-{PIO_VERSION}'
-        cache = ROOT / '.cache/gar-target-build' / tag
-    python = runtime / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
-    env = dict(os.environ, PLATFORMIO_CORE_DIR=str(cache / 'core'),
-               PLATFORMIO_BUILD_DIR=str(cache / 'build'),
-               PLATFORMIO_LIBDEPS_DIR=str(cache / 'libdeps'))
-    return runtime, python, cache, env
+    try:
+        return composition_runtime_paths(ROOT, PIO_VERSION)
+    except ValueError as error:
+        raise BuildError(str(error)) from error
 
 
 def build_firmware():
-    runtime, python, cache, env = runtime_paths()
+    runtime, _, cache, _ = runtime_paths()
     require_plain_path(runtime)
     require_plain_path(cache)
-    if not python.is_file():
-        venv.EnvBuilder(with_pip=True).create(runtime)
-    check = subprocess.run([str(python), '-c',
-                            f"import platformio; assert platformio.__version__ == '{PIO_VERSION}'"],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
-    if check.returncode:
-        subprocess.run([str(python), '-m', 'pip', 'install', '--disable-pip-version-check',
-                        f'platformio=={PIO_VERSION}'], env=env, check=True)
-    subprocess.run([str(python), '-m', 'platformio', 'run',
-                    '-d', str(ROOT / 'firmware/stickc-plus2'), '-e', PIO_ENV], env=env, check=True)
-    return cache / 'build' / PIO_ENV, cache / 'core/packages'
+    return product().build(), cache / 'core/packages'
 
 
 def read_binary(path, maximum):

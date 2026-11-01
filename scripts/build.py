@@ -10,6 +10,7 @@ import subprocess
 import sys
 import urllib.request
 import zipfile
+from composition import product
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPORTS = ['feed_bytes', 'hardware', 'button', 'tick', 'snapshot', 'take_output',
@@ -103,33 +104,47 @@ def main():
         # A fixed script, with paths passed as positional arguments instead of interpolated shell code.
         command = 'export EMSDK_QUIET=1; if [ -f "$HOME/.cache/gar-ui/emsdk/emsdk_env.sh" ]; then . "$HOME/.cache/gar-ui/emsdk/emsdk_env.sh"; fi; exec python3 "$@"'
         forwarded = ['--ui-only'] if args.ui_only else []
+        if args.output:
+            output = subprocess.check_output(['wsl', '-d', args.wsl, '--exec', 'wslpath', '-a', args.output.resolve().as_posix()], text=True).strip()
+            forwarded += ['--output', output]
         subprocess.run(['wsl', '-d', args.wsl, '--exec', 'bash', '-c', command, 'gar-build', script, *forwarded], check=True)
         return
     env = compiler_environment() if args.bootstrap else dict(os.environ)
     if not shutil.which('emcc', path=env.get('PATH')):
         parser.error('Activate Emscripten first, or use --wsl DISTRO on Windows. See README.md.')
     deps = dependencies()
-    app = ROOT / 'sources/gar-vibe-remote/vibe-remote/compact-ui'
-    firmware = ROOT / 'firmware/stickc-plus2'
+    selected = product()
+    generated = selected.prepare()
+    application = selected.components['application']
+    app = application / 'vibe-remote/compact-ui'
+    firmware = ROOT / selected.data['build']['project']
+    display = selected.profile['resources']['display']
     output = args.output or ROOT / ('simulation/ui-runtime' if args.ui_only else 'simulation/runtime')
     config = firmware / 'include/stickc_lv_conf.h'
     command = [sys.executable, str(ROOT / 'sources/gar-tools/web-simulator/build_lvgl.py'),
                '--lvgl', str(deps['lvgl']), '--json-library', str(deps['ArduinoJson']),
                '--app', str(app), '--config', str(config),
                '--source', str(app.parent / 'touch-ui/vibe_jp_16.c'), '--app-api', 'minimal',
-               '--width', '135', '--height', '240', '--jobs', '4',
+               '--width', str(display['width']), '--height', str(display['height']), '--jobs', '4',
+               '--include', str(generated),
                '--output', str(output), '--cache', str(cache_root() / ('ui-objects' if args.ui_only else 'app-objects'))]
     exports = ['receive', 'hardware', 'button', 'refresh', 'snapshot', 'take_action'] if args.ui_only else EXPORTS
     if not args.ui_only:
-        command += ['--entry', str(ROOT / 'simulation/host-entry.cpp'),
-                    '--include', str(firmware / 'include'),
-                    '--source', str(firmware / 'src/DeviceApplication.cpp')]
+        command += ['--entry', str(ROOT / 'simulation/host-entry.cpp')]
+        for path in selected.data['build']['includes']:
+            command += ['--include', str(application / path)]
+        for path in selected.data['build']['sources']:
+            command += ['--source', str(application / path)]
     for name in exports:
         command += ['--export', 'gar_app_' + name]
     subprocess.run(command, env=env, check=True)
     if not args.ui_only:
         metadata = json.loads((output / 'build.json').read_text(encoding='utf-8'))
-        sources = [ROOT / 'simulation/host-entry.cpp', firmware / 'src/DeviceApplication.cpp',
+        sources = [ROOT / 'simulation/host-entry.cpp', ROOT / 'product.json',
+                   ROOT / selected.data['hardware']['binding'], selected.profile_path,
+                   *sorted(generated.glob('*.h')),
+                   *[application / path for path in selected.data['build']['sources']],
+                   *sorted((application / 'vibe-remote/device-app').glob('*.h')),
                    *sorted((firmware / 'include').glob('*.h')),
                    *sorted(app.glob('*.cpp')), *sorted(app.glob('*.h')),
                    app.parent / 'touch-ui/vibe_jp_16.c', Path(__file__), ROOT / 'dependencies.json']
@@ -138,7 +153,7 @@ def main():
             digest.update(source.relative_to(ROOT).as_posix().encode())
             digest.update(source.read_bytes())
         metadata.update(applicationSourceHash=digest.hexdigest(),
-                        runtime='shared-device-application',lvglHeapBytes=48*1024,
+                        runtime='shared-device-application',lvglHeapBytes=selected.data['application']['lvgl_heap_bytes'],
                         toolchain=EMSDK_VERSION if args.bootstrap else 'external')
         (output / 'build.json').write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
 
