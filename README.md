@@ -1,6 +1,6 @@
 # GarVibeRemote-M5StickC
 
-共通アプリの改名と既存環境の更新は、[リポジトリ名の移行手順](docs/REPOSITORY_RENAME.md)を参照してください。
+共通アプリのリポジトリ移行については[移行メモ](docs/REPOSITORY_RENAME.md)を参照してください。
 
 <p align="center">
   <img src="docs/images/viberemote-cover.png" alt="VibeRemote — AIの進捗、手元でwわかる！" width="360">
@@ -13,6 +13,25 @@ PCから離れている間も、M5StickC Plus2でCodexの状態を確認し、�
 
 通常の導入は、以下の実機向け手順を使ってください。**シミュレータの起動、Emscripten、WSLは不要です。**
 開発用Webシミュレータは[後半](#開発者向けwebシミュレータ)に分けています。
+
+GARを使う場合は、[GARでPlus2へ導入する手順](docs/GAR.md)に沿って
+`gar target build` → `gar target deploy`でビルド・書き込みができます。
+GARは保存した成果物を検証して書き込みます。Codex監視・Bluetooth中継の準備は、以下のPC側の手順を使います。
+
+## アプリ・ツール・基板を組み合わせる構成
+
+構成の正本は[product.json](product.json)、詳細は[コンポジション](docs/COMPOSITION.md)です。
+この変更は`refactor/board-composition`ブランチにあります。
+
+| 役割 | submodule | 内容 |
+| --- | --- | --- |
+| アプリ | `sources/gar-vibe-remote` | 画面と実機／PC共通のDeviceApplication |
+| 共通ツール | `sources/gar-tools` | 構成検査・ビルド・シミュレータ部品 |
+| 基板 | `sources/board-m5stickc-plus2` | 内蔵部品の仕様・ドライバ依存・Arduino I/O |
+
+Productには、アプリの設定、使う部品名、基板I/Oとアプリの接続、PCのCodex連携、模擬シナリオを残します。
+GPIO番号や基板初期化を複製せず、実機とPCは同じアプリソースを使います。
+`python tools/product.py describe`で、選択した構成と固定コミットを確認できます。
 
 ## AIに導入を頼む
 
@@ -43,7 +62,7 @@ USBケーブルの接続、ペアリングの番号照合、Hookのレビュー�
 | ケーブル | 給電だけでなく**データ通信に対応したUSBケーブル** |
 | PCのツール | Git、Python 3.10以上、Node.js 24以上とnpm、インターネット接続 |
 | 監視対象 | ローカルで動くCodex。チャットの選択式質問連携はCodex Appを使用 |
-| ソースの取得 | 本リポジトリと、公開submoduleの[gar-vibe-remote](https://github.com/ThousandsOfTies/gar-vibe-remote)、[gar-tools](https://github.com/ThousandsOfTies/gar-tools)をGitHubから取得できること |
+| ソースの取得 | 本リポジトリと、公開submoduleの[gar-vibe-remote](https://github.com/ThousandsOfTies/gar-vibe-remote)、[gar-tools](https://github.com/ThousandsOfTies/gar-tools)、[gar-board-m5stickc-plus2](https://github.com/ThousandsOfTies/gar-board-m5stickc-plus2)をGitHubから取得できること |
 
 共有ソースは公開submoduleです。`--recurse-submodules`で一緒に取得します。
 導入時にPlatformIOやVS Codeを別途セットアップする必要はありません。ファームウェアのビルドに必要なツールはスクリプトが専用環境へ準備します。
@@ -58,14 +77,14 @@ USBケーブルの接続、ペアリングの番号照合、Hookのレビュー�
 新規取得では次を使います。既存のcheckoutがある場合は、その作業内容を保持して再利用してください。
 
 ```powershell
-git clone --recurse-submodules https://github.com/ThousandsOfTies/GarVibeRemote-M5StickC.git
+git clone --branch refactor/board-composition --recurse-submodules https://github.com/ThousandsOfTies/GarVibeRemote-M5StickC.git
 cd GarVibeRemote-M5StickC
 # submoduleを取得していない既存checkoutの場合:
 git submodule update --init --recursive
 ```
 
 submoduleはProductで固定したコミットを使い、導入のために`--remote`で更新しません。
-共有UIの変更は`gar-vibe-remote`の`main`へ統合しています。
+共有UIと共通アプリはProductのsubmoduleで固定したコミットを使います。
 実機のビルド対象は本Productの`firmware/stickc-plus2/platformio.ini`です。
 最初に次を読みます。スキルをまだインストールしていなくても、リポジトリ内のファイルを直接読めます。
 
@@ -245,28 +264,32 @@ BLE、Copilot／Claudeなど他クライアント専用の連携、長時間利�
 ## 開発者向け：Webシミュレータ
 
 ここからは開発・UI確認用です。通常の実機導入では省略します。
-Python 3.10以上、Node.js 24以上、Emscriptenが必要です。共有リポジトリもsubmoduleとして取得します。
+実機と共通のC++アプリ本体（UI・JSONL受信・通信の所有権・ペアリング処理）を、
+PC上のNode + WASMで動かします。WebPanelは描画結果を表示し、物理ボタン相当の入力を送ります。
+VMは不要です。GARのビルド環境はDocker、実行環境はPCのNode.js 24以上です。
+初回ビルド時に固定版Emscriptenを専用キャッシュへ取得します。
 
 ```powershell
-git clone --recurse-submodules https://github.com/ThousandsOfTies/GarVibeRemote-M5StickC.git
-cd GarVibeRemote-M5StickC
-# Emscriptenを有効にした環境で一度ビルド
-python scripts/build.py
-# WSLにEmscriptenを用意してあるWindowsでは代わりに:
-# python scripts/build.py --wsl Ubuntu-26.04
-python scripts/simulate.py --port 8772
+# GARにProductを登録し、SimulationEnvironmentをhost_processにする
+gar config
+gar sim build --workspace Local/GarVibeRemote-M5StickC
+gar sim deploy --workspace Local/GarVibeRemote-M5StickC
+gar sim start --workspace Local/GarVibeRemote-M5StickC
+gar sim diag --workspace Local/GarVibeRemote-M5StickC --json
+# 終了するとき:
+gar sim stop --workspace Local/GarVibeRemote-M5StickC
 ```
 
-[シミュレータを開く](http://127.0.0.1:8772/)。UIソース変更後は再ビルドしてページを再読み込みします。
+[シミュレータを開く](http://127.0.0.1:8772/)。変更後は停止し、build → deploy → startを実行してページを再読み込みします。
 実機と同じCodexの本番状態を表示する場合は、別端末で`python scripts/setup_remote.py simulator-feed`を起動し、
 [本番表示](http://127.0.0.1:8772/?live=1)を開きます。閲覧専用で、回答は実機から行います。
 接続トークンはPC内の中継だけで使います。試験データの画面は通常のURLで引き続き使用できます。
 依存ライブラリは`dependencies.json`のバージョン・SHA256で検証して取得し、`.cache`へ保存します。
 生成WASMは`simulation/runtime`に置き、Gitには含めません。
 
-Emscriptenの新規導入は[公式手順](https://emscripten.org/docs/getting_started/downloads.html)を参照してください。
-`--wsl`はそのWSLのPATH、または`~/.cache/gar-ui/emsdk/emsdk_env.sh`を使用します。
-HTTPサーバは静的ファイルの配信だけを行います。Hookの変更や中継の起動は行いません。
+構成、再現範囲、試験APIは[シミュレータ開発ガイド](docs/SIMULATION.md)を参照してください。
+起動・停止はGAR、HTTP入出力と模擬PCはProduct、実機接続とHook設定は既存の導入手順が担当します。
+シミュレータを起動しても、実機や監視サービスの設定は変更しません。
 
 ## 操作
 
@@ -302,16 +325,23 @@ Cは2秒以上押して離すと電源ON、6秒以上でOFFも試せます。実
 ## 開発時のUI構成と責務
 
 ```text
-simulation/adapter.mjs  ── sessions / state / ack ──▶ C++ CompactUi (WASM / LVGL 7)
-    模擬PC・シナリオ    ◀──── uiAction ──────────      │ 135×240 pixels
-              ▲                             ▼
-              └──── 物理ボタンedge ── <gar-stickc-plus2> + canvas
+WebPanel: <gar-stickc-plus2> + canvas
+        │ ボタンedge / HTTP       ▲ RGBA framebuffer / HTTP
+        ▼                        │
+Node: host-server.cjs ── C++ DeviceApplication (WASM / LVGL 7)
+        模擬PC        ⇄ JSONL ⇄     │
+                                    └─ 実機も同じDeviceApplicationを使用
 ```
 
 - `sources/gar-tools/web-simulator/components/m5stickc-plus2.mjs`：再利用可能な筐体・LCD境界・物理ボタン。
 - `sources/gar-vibe-remote/vibe-remote/compact-ui/`：C++によるLVGL描画、自動スクロール、状態の優先度による自動選択、セッション一覧、回答の選択と決定。
-- `simulation/`：Product固有の文面・模擬PC・接続条件・画面構成。
-- `scripts/simulate.py`：共通HTTPサーバへの薄い入口。
+- `sources/gar-vibe-remote/vibe-remote/device-app/DeviceApplication.cpp`：実機・PC共通のJSONL受信、所有権、接続期限、ペアリング、UI・回答連携。
+- `sources/board-m5stickc-plus2/arduino/`：実機のM5・USB・SPP・LCD・時計のI/O。
+- `firmware/stickc-plus2/src/main.cpp`：基板I/Oと共通アプリのcallback接続。
+- `simulation/host-entry.cpp`：共通アプリとPC実行環境をつなぐバイト列・時間・ボタン・描画のAPI。
+- `simulation/host-server.cjs` / `host-controller.cjs`：HTTP入出力とProduct固有の模擬PC・シナリオ。
+- `simulation/adapter.mjs`：Web Componentsの公開イベントをHTTPへ渡し、描画結果を表示する薄い接続。
+- `scripts/product-sim-build.sh`：GARのSIM_APPビルドhook。配布するモジュールとWebPanelをまとめる。
 - `hardware/binding.json`：Plus2の画面・ボタン対応。
 
 入力は既存VibeRemoteの`state`形式と、全件を渡す`sessions`形式です。
@@ -346,6 +376,8 @@ PCブリッジは設定した監視範囲から最大16セッションを配信�
 ## 開発時の検証
 
 ```powershell
+node --test tests/device_application.test.mjs tests/host_simulator.test.cjs
+# sim buildが別途生成するUI単体試験用モジュール（配布成果物には含めない）
 node --test tests/ui.test.mjs
 node --test tests/device_bridge.test.cjs
 node --test tests/simulator_feed.test.cjs
@@ -355,7 +387,7 @@ node --test tests/pc_runtime.test.cjs
 node --test tests/native_chat_reply.test.cjs
 python -m unittest discover -s tests -p 'test_*.py' -v
 # Emscripten有効時の通信部品テスト（生成先は.cache内）
-em++ -std=c++17 -Ifirmware/stickc-plus2/include tests/device_link.cpp -sSINGLE_FILE=1 -sENVIRONMENT=node -sEXIT_RUNTIME=1 -o .cache/device-link-test.cjs
+em++ -std=c++17 -Isources/gar-vibe-remote/vibe-remote/device-app sources/gar-vibe-remote/tests/device_link.cpp -sSINGLE_FILE=1 -sENVIRONMENT=node -sEXIT_RUNTIME=1 -o .cache/device-link-test.cjs
 node .cache/device-link-test.cjs
 # 共通部品の単体例（別ポートで起動）
 python sources/gar-tools/web-simulator/serve.py --panel sources/gar-tools/web-simulator/examples/stickc-parts --port 8773
@@ -368,8 +400,8 @@ UI試験は実際のWASMとLVGL描画を使い、文字欠落、スクロール�
 PC側の試験は隔離した設定・仮の接続を使い、設定検証、起動失敗時の終了、送信直前の監視対象確認、
 履歴内のユーザー回答判定、実機とWeb配信の依存関係も確認します。
 部品単体例は縦・横の2台を独立して操作できます。Product adapterは部品のShadow DOMを参照しません。
-シミュレータ起動中に`http://127.0.0.1:8772/tests/index.html`を開くと、Productのボタン入力から
-模擬PCの受信確認までのブラウザ連携試験も実行できます。
+共通アプリの試験では、実際のWASMへ分割バイト列を送り、USB／SPPの所有権・接続期限・
+ペアリング・回答の宛先を確認します。HTTP試験ではプロセスのbuild IDと実際の画素も照合します。
 
 ハードウェア参照：[M5Stack公式 StickC Plus2](https://docs.m5stack.com/en/core/StickC-Plus2)。
 共通ソースはsubmoduleです。変更時は共有リポジトリを先にコミット・プッシュし、そのコミットをこのProductで固定します。

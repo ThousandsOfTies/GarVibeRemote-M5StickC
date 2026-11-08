@@ -11,9 +11,12 @@ from pathlib import Path
 import subprocess
 import sys
 import venv
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from composition import product
+from embedded import ensure_toolchain
 
 ROOT=Path(__file__).resolve().parents[1]
-PROJECT=ROOT/'firmware/stickc-plus2'
+PROJECT=ROOT/product().data['build']['project']
 PYTHON=ROOT/'.gar/firmware-tools'/('Scripts/python.exe' if os.name=='nt' else 'bin/python')
 spec=importlib.util.spec_from_file_location('stickc_setup',ROOT/'scripts/setup_remote.py')
 setup=importlib.util.module_from_spec(spec);spec.loader.exec_module(setup)
@@ -26,10 +29,22 @@ def environment():
                PLATFORMIO_LIBDEPS_DIR=str(cache/identity/'libs'))
     return env
 
-def toolchain():
+def ensure_python():
     if not PYTHON.is_file():venv.EnvBuilder(with_pip=True).create(PYTHON.parent.parent)
-    check=subprocess.run([str(PYTHON),'-c',"import platformio; assert platformio.__version__ == '6.1.19'"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-    if check.returncode:subprocess.run([str(PYTHON),'-m','pip','install','platformio==6.1.19'],check=True)
+
+
+def toolchain():
+    selected=product()
+    selected.prepare()
+    ensure_toolchain(PYTHON,selected.profile['platformio']['core_version'])
+
+
+def serial_toolchain():
+    # GAR builds in Docker. Reading/backing up the board must not require a
+    # second firmware build on the Windows host merely to obtain esptool.
+    ensure_python()
+    check=subprocess.run([str(PYTHON),'-c',"import esptool; assert esptool.__version__ == '4.5.1'"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    if check.returncode:subprocess.run([str(PYTHON),'-m','pip','install','esptool==4.5.1'],check=True)
 
 def usb_port(port):
     ports,_=setup.serial_ports()
@@ -38,9 +53,10 @@ def usb_port(port):
     return port.upper() if os.name=='nt' else port
 
 def esptool(port,*args):
-    program=Path(environment()['PLATFORMIO_CORE_DIR'])/'packages/tool-esptoolpy/esptool.py'
-    if not program.is_file():raise RuntimeError('先にfirmware.py buildを実行してください。')
-    return [str(PYTHON),str(program),'--chip','esp32','--port',port,'--baud','921600',*map(str,args)]
+    serial_toolchain()
+    selected=product()
+    return [str(PYTHON),'-m','esptool','--chip',selected.profile['flash']['chip'],'--port',port,
+            '--baud',selected.profile['platformio']['upload_speed'],*map(str,args)]
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
@@ -56,10 +72,11 @@ def main():
             toolchain();subprocess.run([str(PYTHON),'-m','platformio','run','-d',str(PROJECT)],env=environment(),check=True)
         elif args.command=='identify':subprocess.run(esptool(args.port,'flash_id'),check=True)
         elif args.command=='backup':
+            flash_size=product().profile['flash']['size_bytes']
             folder=ROOT/'artifacts/firmware'/datetime.now().strftime('%Y%m%d-%H%M%S')
             folder.mkdir(parents=True,exist_ok=False);target=folder/'original-flash.bin'
-            subprocess.run(esptool(args.port,'read_flash','0','0x800000',target),check=True)
-            if target.stat().st_size!=0x800000:raise RuntimeError('バックアップのサイズが8MBと一致しません。')
+            subprocess.run(esptool(args.port,'read_flash','0',f'{flash_size:#x}',target),check=True)
+            if target.stat().st_size!=flash_size:raise RuntimeError('バックアップのサイズが基板プロファイルと一致しません。')
             digest=hashlib.sha256(target.read_bytes()).hexdigest()
             (folder/'backup.json').write_text(json.dumps({'model':args.model,'size':target.stat().st_size,'sha256':digest})+'\n',encoding='utf-8')
             print(f'Backup saved: {target}')

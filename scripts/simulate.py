@@ -1,11 +1,12 @@
-"""Static HTTP only: no bridge, process launcher, hooks, or device configuration."""
-import importlib.util
+"""Developer entry for the PC application; use GAR for managed lifecycle."""
 from pathlib import Path
+import shutil
+import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-path = ROOT / 'sources/gar-tools/web-simulator/serve.py'
-spec = importlib.util.spec_from_file_location('gar_simulator_server', path)
-server = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(server)
 if __name__ == '__main__':
-    server.main(default_panel=ROOT / 'simulation')
+    node = shutil.which('node')
+    if not node:
+        raise SystemExit('Node.js is required; normal managed startup uses gar sim start.')
+    raise SystemExit(subprocess.call([node, str(ROOT / 'simulation/host-server.cjs'), *sys.argv[1:]]))

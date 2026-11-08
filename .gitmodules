@@ -4,3 +4,6 @@
 [submodule "sources/gar-tools"]
 	path = sources/gar-tools
 	url = https://github.com/ThousandsOfTies/gar-tools.git
+[submodule "sources/board-m5stickc-plus2"]
+	path = sources/board-m5stickc-plus2
+	url = https://github.com/ThousandsOfTies/gar-board-m5stickc-plus2.git
